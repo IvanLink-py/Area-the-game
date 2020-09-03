@@ -885,7 +885,7 @@ if __name__ == '__main__':
 
     grid_widget_size = (500, 500)
     grid_size = (20, 20)
-    grid_pos = (50, 50)
+    grid_pos = (70, 70)
     lines = (False, True)
     players = (Player, Player)
     max_figure_size = (6, 6)
