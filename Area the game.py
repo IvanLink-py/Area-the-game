@@ -11,9 +11,6 @@ import pygame
 
 pygame.init()
 pygame.font.init()
-win = pygame.display.set_mode((800, 600), pygame.SRCALPHA)  # размеры X и Y
-pygame.display.set_icon(pygame.image.load("ico.png"))
-pygame.display.set_caption("Area")
 
 
 class Rectangle:
@@ -283,12 +280,13 @@ class Game:
     clock = pygame.time.Clock()
 
     def __init__(self, players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines):
-        self.players = players
         self.step = 0
-        self.current_player = self.players[self.step % 2]
 
         self.is_first_player_step = True
         self.grid = Grid_of_game(grid_pos, gws, grid_size, inlines, outlines)
+
+        self.players = tuple((player(self.grid) for player in players))
+        self.current_player = self.players[self.step % 2]
 
         self.grid.area = [Rectangle(player_colors[0], (0, 0), (1, 1)),
                           Rectangle(player_colors[1], (self.grid.column - 1, self.grid.row - 1), (1, 1))]
@@ -766,6 +764,21 @@ class MainMenu:
 
 class Player:
 
+    def __init__(self, grid: Grid_of_game):
+        self.grid_data = (grid.grid_pos, grid.grid_size, grid.cell_size)
+        self.figure_size = [random.randint(1, menu.game.max_sizes[0]),
+                            random.randint(1, menu.game.max_sizes[1])]
+
+    def get_in_grid_pos(self):
+        mouse = pygame.mouse.get_pos()
+        a = [math.floor((self.grid_data[2][0]) * (mouse[0] // self.grid_data[2][0])),
+             math.floor((self.grid_data[2][1]) * (mouse[1] // self.grid_data[2][1]))]
+        return a
+
+    def thing(self):
+        return math.floor(self.figure_size[0] * self.grid_data[2][0]), \
+               math.floor(self.figure_size[1] * self.grid_data[2][1])
+
     @staticmethod
     def get_mouse_pos():
         return pygame.mouse.get_pos()
@@ -862,18 +875,23 @@ def start_music():
     pygame.mixer.music.play(-1)
 
 
-colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
-
-grid_widget_size = (500, 500)
-grid_size = (50, 50)
-grid_pos = (50, 50)
-lines = (False, True)
-players = (Player(), Player())
-max_figure_size = (6, 6)
-
-settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines]
-
 if __name__ == '__main__':
+
+    win = pygame.display.set_mode((800, 600), pygame.SRCALPHA)  # размеры X и Y
+    pygame.display.set_icon(pygame.image.load("ico.png"))
+    pygame.display.set_caption("Area")
+
+    colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
+
+    grid_widget_size = (500, 500)
+    grid_size = (20, 20)
+    grid_pos = (50, 50)
+    lines = (False, True)
+    players = (Player, Player)
+    max_figure_size = (6, 6)
+
+    settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines]
+
     menu = MainMenu(settings)
     start_music()
     while True:
