@@ -12,6 +12,8 @@ import pygame
 pygame.init()
 pygame.font.init()
 
+IP = ('localhost', 9090)
+
 
 class Rectangle:
     def __init__(self, color, pos1, size, text=None):
@@ -27,7 +29,7 @@ class Rectangle:
         self.color = color
 
     def draw(self, grid):
-        return grid.get_figure_draw((self.x1, self.y1), (self.x2, self.y2), self.color)
+        return grid.get_figure_draw(self)
 
     def true_draw(self):
         pygame.draw.rect(win, 0xFFFFFF, (self.x1, self.y1, self.x2, self.y2))
@@ -37,12 +39,13 @@ class Button:
     hover = False
 
     def __init__(self, pos1, pos2, target, color_reg, color_hov=None, text=None, text_color=None, font=None,
-                 font_size=None, text_correct=(10, -2)):
+                 font_size=None, text_correct=(10, -2), args=()):
         self.pos1 = pos1
         self.pos2 = pos2
 
         self.colors = (color_reg, color_hov if color_hov is not None else color_reg)
         self.target = target
+        self.args = args
 
         if text is not None and text_color is not None and font is not None and font_size is not None:
             self.text_obj = pygame.font.SysFont(font, font_size)
@@ -78,7 +81,7 @@ class Button:
                     self.pos1[1] < mouse[1] < self.pos1[1] + self.pos2[1]) and (
                     pygame.mouse.get_pressed()[0]):
                 if pygame.mouse.get_pressed()[0]:
-                    self.target()
+                    self.target(*self.args)
 
     def checker(self):
         self.check_hover()
@@ -115,85 +118,12 @@ class Grid_of_game:
         self.area = []
         self.raw_area = [[0 for _ in range(grid_size[0])] for _ in range(grid_size[1])]
 
-    def set_mouse_obj(self, mouse_coord, figure_size=None, color=pygame.Color(255, 255, 255)):
+    def new_figure(self, figure: Rectangle, player_id):
+        self.area.append(figure)
 
-        if not self.is_mouse:
-            if figure_size is None:
-                self.mouse_figure_size = [random.randint(1, menu.game.max_sizes[0]),
-                                          random.randint(1, menu.game.max_sizes[1])]
-
-        self.is_mouse = True
-        self.mouse_pos = mouse_coord
-
-        self.mouse_figure_color = color
-
-    def change_mouse(self, absolute=None, relatively=None):
-        if self.is_mouse == True:
-            if absolute is not None:
-                self.mouse_figure_size = absolute
-
-            elif relatively is not None:
-                self.mouse_figure_size[0] += relatively[0]
-                self.mouse_figure_size[1] += relatively[1]
-            else:
-                raise NotImplemented
-
-    def del_mouse_obj(self):
-        self.is_mouse = False
-
-    def save_mouse_figure(self):
-        x1, y1 = (self.mouse_pos[0] - self.grid_pos[0]) // self.cell_size[0], \
-                 (self.mouse_pos[1] - self.grid_pos[1]) // self.cell_size[1]
-        contacts = []
-        for i in range(self.mouse_figure_size[0]):
-            try:
-                contacts.append(self.raw_area[math.floor(x1 + i)][math.floor(y1 - 1)])
-            except IndexError:
-                contacts.append(0)
-            try:
-                contacts.append(self.raw_area[math.floor(x1 + i)][math.floor(y1 + self.mouse_figure_size[1])])
-            except IndexError:
-                contacts.append(0)
-
-        for i in range(self.mouse_figure_size[1]):
-            try:
-                contacts.append(self.raw_area[math.floor(x1 - 1)][math.floor(y1 + i)])
-            except IndexError:
-                contacts.append(0)
-            try:
-                contacts.append(self.raw_area[math.floor(x1 + self.mouse_figure_size[0])][math.floor(y1 + i)])
-            except IndexError:
-                contacts.append(0)
-
-        # print(f"{contacts}", end="\n")
-
-        inside = []
-
-        for i in range(self.mouse_figure_size[0]):
-            for j in range(self.mouse_figure_size[1]):
-                inside.append(self.raw_area[math.floor(x1 + i)][math.floor(y1 + j)])
-
-        if (menu.game.step % 2 + 1 in contacts or (self.mouse_figure_size == (1, 1) and menu.game.alone_one)) \
-                and not any(inside) and inside[0] == 0:
-
-            self.area.append(Rectangle(colorsRGBA[menu.game.step % 2], (x1, y1),
-                                       self.mouse_figure_size))
-
-            for i in range(self.mouse_figure_size[0]):
-                for j in range(self.mouse_figure_size[1]):
-                    self.raw_area[math.floor(x1 + i)][math.floor(y1 + j)] = menu.game.step % 2 + 1
-
-            global myText
-            global myText2
-            menu.game.scores[menu.game.step % 2] += self.mouse_figure_size[0] * self.mouse_figure_size[1]
-            myText = menu.game.scores1.render(str(menu.game.scores[0]), 1, colorsRGBA[0])
-            myText2 = menu.game.scores2.render(str(menu.game.scores[1]), 1, colorsRGBA[1])
-
-            menu.game.grid.change_mouse(
-                absolute=(random.randint(1, menu.game.max_sizes[0]), random.randint(1, menu.game.max_sizes[1])))
-
-            menu.game.step += 1
-            menu.game.get_current_player()
+        for x in range(figure.x1, figure.x1 + figure.x2):
+            for y in range(figure.y1, figure.y1 + figure.y2):
+                self.raw_area[x][y] = 1 + player_id
 
     def get_figure_draw(self, figure, *args):
         if isinstance(figure, Rectangle):
@@ -238,16 +168,8 @@ class Grid_of_game:
         for sub in instructions[1]:
             instruction.append(sub)
 
-        if self.is_mouse:
-            x1 = math.floor((self.cell_size[0]) * (self.mouse_pos[0] // self.cell_size[0]))
-            y1 = math.floor((self.cell_size[1]) * (self.mouse_pos[1] // self.cell_size[1]))
-            x2 = math.floor(self.mouse_figure_size[0] * self.cell_size[0])
-            y2 = math.floor(self.mouse_figure_size[1] * self.cell_size[1])
-            if x1 > -1 + self.grid_pos[0] and x1 + x2 < self.figure_size[0] + 1 + self.grid_pos[0]:
-                if y1 > -1 + self.grid_pos[1] and y1 + y2 < self.figure_size[1] + 1 + self.grid_pos[1]:
-                    instruction.append((pygame.draw.rect, (
-                        win, self.mouse_figure_color,
-                        (x1 + 1, y1, x2 + 1, y2 + 1))))
+        if menu.game.current_player.can_draw():
+            instruction.append(menu.game.current_player.get_figure().draw(self))
 
         if self.outlines:
             instruction.append((pygame.draw.lines, (
@@ -273,9 +195,6 @@ class Game:
 
     scores2 = pygame.font.SysFont("Gouranga Cyrillic", 32)
 
-    keys = {pygame.K_ESCAPE: False, pygame.K_r: False}
-    mouse_keys = [False, False, False]
-
     fps = 60
     clock = pygame.time.Clock()
 
@@ -284,9 +203,6 @@ class Game:
 
         self.is_first_player_step = True
         self.grid = Grid_of_game(grid_pos, gws, grid_size, inlines, outlines)
-
-        self.players = tuple((player(self.grid) for player in players))
-        self.current_player = self.players[self.step % 2]
 
         self.grid.area = [Rectangle(player_colors[0], (0, 0), (1, 1)),
                           Rectangle(player_colors[1], (self.grid.column - 1, self.grid.row - 1), (1, 1))]
@@ -300,7 +216,11 @@ class Game:
 
         self.scores = [1, 1]
 
-        self.status_bar = self.setup_status_bar((620, 390), (20, 20), (True, True))
+        self.players = tuple(
+            (players[player_i](self.grid, self, self.player_colors[player_i], player_i, max_sizes) for player_i in
+             range(len(players))))
+
+        self.current_player = self.players[self.step % 2]
 
     def get_current_player(self):
         self.current_player = self.players[self.step % 2]
@@ -311,16 +231,18 @@ class Game:
         click_delay = 20
         can_click = False
 
+        self.get_current_player()
+
         while self.play:
             self.back()
 
-            if self.current_player.get_mouse_focus():
-                self.grid.set_mouse_obj(self.current_player.get_mouse_pos(), color=colorsRGBA[self.step % 2])
+            self.current_player.check()
 
             self.score_text()
 
             if can_click:
-                self.keyboard()
+                pass
+                # self.keyboard()
             else:
                 if click_delay > 0:
                     click_delay -= 1
@@ -330,7 +252,7 @@ class Game:
             if not self.end_game:
 
                 instr = self.grid.get_main_draw()
-                instr += self.status_bar()
+                instr += self.status_bar((620, 390), (20, 20), (True, True))
 
                 for i in instr:
                     i[0](*i[1])
@@ -342,8 +264,8 @@ class Game:
                     self.play = False
                     quit_ = True
                     break
-                else:
-                    pass
+                elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.KEYDOWN:
+                    self.current_player.keyboard(event)
 
             if quit_:
                 break
@@ -353,50 +275,49 @@ class Game:
         else:
             self.show_end_msg()
 
-    def setup_status_bar(self, pos, cell_size, lines):
+    def set_mouse_figure(self, figure):
+        self.grid.new_figure(figure, self.step % 2)
+        self.scores[self.step % 2] += figure.y2 * figure.x2
+        self.step += 1
+        self.get_current_player()
+
+    def status_bar(self, pos, cell_size, lines):
         bar_size = list((ci + 2 for ci in self.max_sizes))
         figure_size = list((bar_size[ci] * cell_size[ci] for ci in range(2)))
 
-        def get_instr():
-            nonlocal lines
-            nonlocal figure_size
-            nonlocal bar_size
+        instruction = [[pygame.draw.rect, (win, 0, (pos, figure_size))]]
+        if lines[1]:
+            instruction.append((pygame.draw.lines, (
+                win, 0x888888, True, (pos, (pos[0] + figure_size[0], pos[1]),
+                                      (pos[0] + figure_size[0],
+                                       pos[1] + figure_size[1]),
+                                      (pos[0], pos[1] + figure_size[1])))))
 
-            instruction = [[pygame.draw.rect, (win, 0, (pos, figure_size))]]
-            if lines[1]:
-                instruction.append((pygame.draw.lines, (
-                    win, 0x888888, True, (pos, (pos[0] + figure_size[0], pos[1]),
-                                          (pos[0] + figure_size[0],
-                                           pos[1] + figure_size[1]),
-                                          (pos[0], pos[1] + figure_size[1])))))
+            instruction.append((pygame.draw.lines, (
+                win, 0, True, ((pos[0] - 1, pos[1] - 1),
+                               (pos[0] + figure_size[0] + 1, pos[1] - 1),
+                               (pos[0] + figure_size[0] + 1,
+                                pos[1] + figure_size[1] + 1),
+                               (pos[0] - 1, pos[1] + figure_size[1] + 1)))))
 
-                instruction.append((pygame.draw.lines, (
-                    win, 0, True, ((pos[0] - 1, pos[1] - 1),
-                                   (pos[0] + figure_size[0] + 1, pos[1] - 1),
-                                   (pos[0] + figure_size[0] + 1,
-                                    pos[1] + figure_size[1] + 1),
-                                   (pos[0] - 1, pos[1] + figure_size[1] + 1)))))
+        figure = menu.game.current_player.get_figure()
 
-            if lines[0]:
-                for i in range(1, bar_size[0]):
-                    instruction.append((pygame.draw.lines, (win, 0x888888, True, (
-                        (math.floor(pos[0] + cell_size[0] * i), pos[1]),
-                        (math.floor(pos[0] + cell_size[0] * i), pos[1] + figure_size[1])
-                    ))))
-                for i in range(1, bar_size[1]):
-                    instruction.append((pygame.draw.lines, (win, 0x888888, True, (
-                        (pos[0], math.floor(pos[1] + cell_size[1] * i)),
-                        (pos[0] + figure_size[0], math.floor(pos[1] + cell_size[1] * i))))))
+        instruction.append((pygame.draw.rect, (win, figure.color,
+                                               ((pos[0] + cell_size[0], pos[1] + cell_size[1]),
+                                                (figure.x2 * cell_size[0], figure.y2 * cell_size[1])))))
 
-            if self.grid.is_mouse:
-                instruction.append((pygame.draw.rect,
-                                    (win, colorsRGBA[self.step % 2], ((pos[0] + cell_size[0], pos[1] + cell_size[1]), (
-                                        cell_size[0] * (self.grid.mouse_figure_size[0]),
-                                        cell_size[1] * (self.grid.mouse_figure_size[1]))))))
+        if lines[0]:
+            for i in range(1, bar_size[0]):
+                instruction.append((pygame.draw.lines, (win, 0x888888, True, (
+                    (math.floor(pos[0] + cell_size[0] * i), pos[1]),
+                    (math.floor(pos[0] + cell_size[0] * i), pos[1] + figure_size[1])
+                ))))
+            for i in range(1, bar_size[1]):
+                instruction.append((pygame.draw.lines, (win, 0x888888, True, (
+                    (pos[0], math.floor(pos[1] + cell_size[1] * i)),
+                    (pos[0] + figure_size[0], math.floor(pos[1] + cell_size[1] * i))))))
 
-            return instruction
-
-        return get_instr
+        return instruction
 
     def show_end_msg(self):
         self.end_msg = True
@@ -406,11 +327,15 @@ class Game:
             menu.gaming = False
             menu.start_new_game()
 
+        def orevuar():
+            pygame.quit()
+            quit()
+
         restart_button = Button((200, 350), (200, 32), self.end_this_game_and_start_new, pygame.Color(255, 255, 255),
                                 pygame.Color(0, 200, 0),
                                 "Restart", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (70, 6))
 
-        end_button = Button((350, 400), (200, 32), quit, pygame.Color(255, 255, 255), pygame.Color(200, 50, 50),
+        end_button = Button((350, 400), (200, 32), orevuar, pygame.Color(255, 255, 255), pygame.Color(200, 50, 50),
                             "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6))
 
         menu_button = Button((55, 400), (200, 32), go_to_menu, pygame.Color(255, 255, 255), pygame.Color(100, 100, 255),
@@ -475,37 +400,6 @@ class Game:
 
         win.blit(myText, (650, 50))
         win.blit(myText2, (650, 100))
-
-    def keyboard(self):
-        def esc():
-            self.grid.change_mouse(absolute=(random.randint(1, 6), random.randint(1, 6)))
-            self.step += 1
-            self.get_current_player()
-
-        def rotate():
-            self.grid.change_mouse(absolute=(self.grid.mouse_figure_size[1], self.grid.mouse_figure_size[0]))
-
-        def set_figure():
-            self.grid.save_mouse_figure()
-
-        key_binds = {pygame.K_ESCAPE: esc, pygame.K_r: rotate, pygame.K_F12: self.fill}
-        mouse_binds = [set_figure, None, rotate]
-
-        for key, func in key_binds.items():
-            if self.current_player.get_keyboard()[key]:
-                if not self.keys[key]:
-                    func()
-                    self.keys[key] = True
-            else:
-                self.keys[key] = False
-
-        for button_id in range(len(mouse_binds)):
-            if self.current_player.get_mouse_keys()[button_id]:
-                if not self.mouse_keys[button_id]:
-                    mouse_binds[button_id]()
-                    self.mouse_keys[button_id] = True
-            else:
-                self.mouse_keys[button_id] = False
 
     def fill(self):
         self.grid.is_mouse = False
@@ -580,6 +474,238 @@ class Game:
         return draw_bg
 
 
+class ServerTerminal:
+    work = True
+    queue = []
+
+    def __init__(self):
+        self.sock = socket.socket()
+
+    def send(self, message):
+        self.conn.send(message.encode('utf-8'))
+
+    def accept(self, target=None):
+        self.sock.bind(('', IP[1]))
+        self.sock.listen(1)
+        self.conn, addr = self.sock.accept()
+        print('connected:', addr)
+        if target is not None:
+            target()
+
+    def accepting(self, target):
+        accept_thread = threading.Thread(target=self.accept, args=[target])
+        accept_thread.start()
+
+    def receiving(self):
+        while self.work:
+            try:
+                rcv_data = self.conn.recv(1024*4)
+                a = rcv_data
+                b = a.decode('utf-8')
+                c = b.split(';')
+                self.queue.extend(c)
+            except (ConnectionAbortedError, ConnectionResetError):
+                if self.work:
+                    quit()
+
+    def start_recv(self):
+        thread = threading.Thread(target=self.receiving)
+        thread.start()
+
+    def get_queue(self):
+        if self.queue:
+            copy = self.queue.copy()
+            self.queue = []
+            return copy
+
+        else:
+            return []
+
+    def close(self):
+        self.conn.close()
+        self.sock.close()
+
+
+class ClientTerminal(ServerTerminal):
+
+    def connect(self, target_connected=None, target_not=None):
+        try:
+            self.sock.connect(IP)
+        except ConnectionRefusedError:
+            if target_not is not None:
+                target_not()
+        else:
+            if target_connected is not None:
+                target_connected()
+
+    def send(self, message):
+        self.sock.send(message.encode('utf-8'))
+
+    def receiving(self):
+        while self.work:
+            try:
+                rcv_data = self.sock.recv(1024 * 4)
+                self.queue.extend(rcv_data.decode('utf-8').split(';'))
+            except (ConnectionAbortedError, ConnectionResetError):
+                if self.work:
+                    quit()
+
+    def close(self):
+        self.sock.close()
+
+
+class NetGame(Game):
+    def __init__(self, terminal, place, players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines):
+        super().__init__(players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines)
+
+        self.terminal = terminal
+        self.players[not place].lock()
+
+    def encode_message(self, message):
+        splinted = message.split(' ')
+
+        if splinted[0] == 'new_figure':
+            self.set_mouse_figure(Rectangle(self.player_colors[self.step % 2],
+                                            (int(splinted[1]), int(splinted[2])),
+                                            (int(splinted[3]), int(splinted[4]))), True)
+
+        elif splinted[0] == 'fill':
+            self.fill(True)
+
+        elif splinted[0] == 'skip':
+            self.step += 1
+            self.get_current_player()
+
+    def get_current_player(self):
+        self.current_player = self.players[self.step % 2]
+
+    def mainloop(self):
+        self.back = self.gen_bg()
+        quit_ = False
+        click_delay = 20
+        can_click = False
+
+        self.get_current_player()
+
+        self.terminal.start_recv()
+
+        while self.play:
+
+            for message in self.terminal.get_queue():
+                if message:
+                    print(message)
+                    self.encode_message(message)
+
+            self.back()
+
+            self.current_player.check()
+
+            self.score_text()
+
+            if can_click:
+                pass
+                # self.keyboard()
+            else:
+                if click_delay > 0:
+                    click_delay -= 1
+                else:
+                    can_click = True
+
+            if not self.end_game:
+
+                instr = self.grid.get_main_draw()
+
+                for i in instr:
+                    i[0](*i[1])
+
+                pygame.display.update()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.play = False
+                    quit_ = True
+                    break
+                elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.KEYDOWN:
+                    self.current_player.keyboard(event)
+
+            if quit_:
+                break
+
+            self.clock.tick(self.fps)
+
+        else:
+            self.show_end_msg()
+
+    def show_end_msg(self):
+        self.end_msg = True
+
+        def go_to_menu():
+            self.end_msg = False
+            menu.gaming = False
+            menu.start_new_game()
+
+        def orevuar():
+            self.terminal.close()
+            pygame.quit()
+            quit()
+
+        end_button = Button((350, 400), (200, 32), orevuar, pygame.Color(255, 255, 255), pygame.Color(200, 50, 50),
+                            "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6))
+
+        menu_button = Button((55, 400), (200, 32), go_to_menu, pygame.Color(255, 255, 255), pygame.Color(100, 100, 255),
+                             "Back to menu", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (120, 6))
+
+        end_window = ((20, 150), (555, 300))
+        shadow = ((25, 155), (555, 300))
+
+        title = 'The end'
+        description = 'Thanks for play'
+
+        end_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
+        end_desc_font = pygame.font.SysFont("Gouranga Cyrillic", 16)
+
+        title_text = end_title_font.render(title, 1, pygame.Color(200, 200, 200), pygame.Color(88, 88, 88))
+        des_text = end_desc_font.render(description, 1, pygame.Color(200, 200, 200), pygame.Color(88, 88, 88))
+
+        instr = self.grid.get_main_draw()
+        for i in instr:
+            i[0](*i[1])
+        pygame.display.update()
+
+        while self.end_msg:
+            pygame.draw.rect(win, pygame.Color(20, 20, 20), shadow)
+            pygame.draw.rect(win, pygame.Color(88, 88, 88), end_window)
+
+            win.blit(title_text, (60, 180))
+            win.blit(des_text, (60, 220))
+            # win.blit(end_description, (302,200))
+
+            end_button.draw()
+            menu_button.draw()
+
+            pygame.display.update()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    quit()
+                else:
+                    pass
+            self.clock.tick(self.fps)
+
+    def set_mouse_figure(self, figure, is_net=False):
+        super().set_mouse_figure(figure)
+        if not is_net:
+            self.terminal.send(f'new_figure {figure.x1} {figure.y1} {figure.x2} {figure.y2};')
+
+    def fill(self, is_net=False):
+        if not is_net:
+            self.terminal.send('fill')
+        self.terminal.work = False
+        super().fill()
+        self.terminal.close()
+
+
+
+
 class MainMenu:
     fps = 60
     clock = pygame.time.Clock()
@@ -589,14 +715,52 @@ class MainMenu:
 
     def mainloop(self):
         def show_online_menu():
+
+            def try_connect(self):
+                def start():
+                    game_title_text = 'Connected'.upper()
+                    game_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
+                    sucs_title = game_title_font.render(game_title_text, 1, pygame.Color(0, 200, 0),
+                                                        pygame.Color(0, 0, 0))
+
+                    win.blit(sucs_title, (480, 180))
+                    pygame.display.update()
+
+                    time.sleep(2)
+
+                    nonlocal self
+                    self.start_new_game(type_of_game=2, terminal=terminal)
+                    self.gaming = True
+
+                    while self.gaming:
+                        self.game.mainloop()
+
+                def fail():
+                    game_title_text = 'Connection fail'.upper()
+                    game_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
+                    fail_title = game_title_font.render(game_title_text, 1, pygame.Color(200, 0, 0),
+                                                        pygame.Color(0, 0, 0))
+
+                    win.blit(fail_title, (480, 145))
+                    # nonlocal start_client_button
+                    # start_client_button.draw()
+
+                    pygame.display.update()
+
+                    time.sleep(2)
+
+                terminal = ClientTerminal()
+                terminal.connect(start, fail)
+
             nonlocal showed_menu
             start_server_button = Button((240, 140), (200, 32), self.server_loop, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
                                          "Start Server", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6))
 
-            start_client_button = Button((460, 140), (200, 32), self.client_loop, pygame.Color(255, 255, 255),
+            start_client_button = Button((460, 140), (200, 32), try_connect, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
-                                         "Start Client", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6))
+                                         "Start Client", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
+                                         args=[self])
 
             showed_menu = [start_server_button, start_client_button]
 
@@ -661,95 +825,71 @@ class MainMenu:
             nonlocal connecting
             connecting = False
 
-        net_player = NetServer()
-
-        abort_button = Button((580, 548), (200, 32), stop, pygame.Color(255, 255, 255), pygame.Color(255, 8, 0),
-                              "Abort", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (-10, 6))
-
-        accept_thread = threading.Thread(target=net_player.accept)
-
-        font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-        time_div = 0
-        time_div2 = 0
-
-        accept_thread.start()
-        while connecting:
-            win.fill(0)
-
-            if not net_player.connected:
-
-                waiting_text = font.render(f"Waiting{'.' * (time_div // 60)}", 1, pygame.Color(255, 255, 255),
-                                           pygame.Color(0, 0, 0))
-                win.blit(waiting_text, (350, 278))
-                abort_button.draw()
-                time_div += 1
-
-            else:
-                waiting_text = font.render(f"Successful", 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
-                win.blit(waiting_text, (350, 278))
-                time_div2 += 1
-                if time_div2 >= 120:
-                    connecting = False
-                    start_game = True
-
-            pygame.display.update()
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    connecting = False
-                    break
-                else:
-                    pass
-
-            if time_div >= 240:
-                time_div = 0
-
-            self.clock.tick(self.fps)
-        else:
-            if start_game:
-                self.setting[0] = (Player(), net_player)
-                net_player.working()
-                self.game_loop()
-
-    def client_loop(self):
-        connecting = True
-
-        def stop():
+        def successful():
             nonlocal connecting
+            nonlocal start_game
             connecting = False
+            start_game = True
 
-        abort_button = Button((580, 548), (200, 32), stop, pygame.Color(255, 255, 255), pygame.Color(255, 8, 0),
-                              "Abort", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (-10, 6))
+        terminal = ServerTerminal()
+        terminal.accepting(target=successful)
 
-        font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-        ip_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-        ip = f"{random.randint(1, 255)}.{random.randint(1, 255)}.{random.randint(1, 255)}.{random.randint(1, 255)}"
-        time_div = 0
-        while connecting:
+        game_title_text = '"Area" the game'.upper()
+        game_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
+        game_title = game_title_font.render(game_title_text, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
+
+        ip_address = f"{IP[0]}:{IP[1]}"
+        ip_title = game_title_font.render(ip_address, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
+
+        abort_button = Button((590, 560), (200, 32), stop, pygame.Color(255, 255, 255), pygame.Color(255, 8, 0),
+                              "Abort", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (30, 6))
+
+        buttons = [abort_button]
+
+        t = 0
+
+        while True:
             win.fill(0)
-            ip_text = ip_font.render(ip, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
-            waiting_text = font.render(f"Connecting{'.' * (time_div // 60)}", 1, pygame.Color(255, 255, 255),
-                                       pygame.Color(0, 0, 0))
+            win.blit(game_title, (300, 50))
+            win.blit(ip_title, (15, 570))
 
-            win.blit(waiting_text, (320, 278))
-            win.blit(ip_text, (10, 569))
+            if not start_game:
+                waiting_text = f"Waiting{'.' * (t // 60)}"
+            else:
+                waiting_text = "Connected"
 
-            abort_button.draw()
+            waiting = game_title_font.render(waiting_text, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
+            win.blit(waiting, (350, 300))
 
-            time_div += 1
+            if t <= 350:
+                t += 1
+            else:
+                t = 0
+
+            for button in buttons:
+                button.draw()
             pygame.display.update()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    connecting = False
-                    break
-                else:
-                    pass
+                    pygame.quit()
+                    quit()
 
-            if time_div >= 240:
-                time_div = 0
+            if start_game:
+                time.sleep(2)
+                break
+
+            if not connecting:
+                break
 
             self.clock.tick(self.fps)
+
+        if start_game:
+            self.start_new_game(type_of_game=1, terminal=terminal)
+            self.gaming = True
+
+            while self.gaming:
+                self.game.mainloop()
 
     def game_loop(self):
         self.start_new_game()
@@ -758,111 +898,204 @@ class MainMenu:
         while self.gaming:
             self.game.mainloop()
 
-    def start_new_game(self):
-        self.game = Game(*self.setting)
+    def start_new_game(self, type_of_game=0, terminal=None):
+        if type_of_game == 0:
+            self.setting[0] = (Player, Player)
+            self.game = Game(*self.setting)
+
+        elif type_of_game == 1:
+            self.setting[0] = (NetPlayer, NetPlayer)
+            self.game = NetGame(terminal, 0, *self.setting)
+
+        elif type_of_game == 2:
+            self.setting[0] = (NetPlayer, NetPlayer)
+            self.game = NetGame(terminal, 1,  *self.setting)
 
 
 class Player:
-
-    def __init__(self, grid: Grid_of_game):
+    def __init__(self, grid: Grid_of_game, game, color, me_id, max_sizes):
         self.grid_data = (grid.grid_pos, grid.grid_size, grid.cell_size)
-        self.figure_size = [random.randint(1, menu.game.max_sizes[0]),
-                            random.randint(1, menu.game.max_sizes[1])]
+        self.grid = grid
+        self.game = game
+
+        self.max_sizes = max_sizes
+
+        self.color = color
+
+        self.me_id = me_id
+
+        self.figure_size = [random.randint(1, self.max_sizes[0]),
+                            random.randint(1, self.max_sizes[1])]
+
+        self.mouse_figure = [self.get_in_grid_pos(), self.figure_size]
+
+    def keyboard(self, event):
+        def skip_turn():
+            self.game.step += 1
+            self.game.get_current_player()
+            self.mouse_figure = [self.get_in_grid_pos(), self.figure_size]
+            self.new_step()
+
+        key_binds = {pygame.K_ESCAPE: skip_turn,
+                     pygame.K_r: self.rotate,
+                     pygame.K_F12: self.game.fill
+                     }
+
+        mouse_binds = [None,
+                       self.set,
+                       None,
+                       self.rotate,
+                       None,
+                       None,
+                       None,
+                       None]
+
+        # print(event.button)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if mouse_binds[event.button] is not None:
+                mouse_binds[event.button]()
+
+        elif event.type == pygame.KEYDOWN:
+            if event.key in key_binds:
+                key_binds[event.key]()
+
+    def set(self):
+        if self.can_set():
+            self.game.set_mouse_figure(self.get_figure())
+            self.new_step()
+
+    def can_set(self):
+
+        in_pos = self.get_in_grid_pos()
+
+        if self.can_draw():
+            for x in range(in_pos[0], in_pos[0] + self.figure_size[0]):
+                for y in range(in_pos[1], in_pos[1] + self.figure_size[1]):
+                    if self.grid.raw_area[x][y] != 0:
+                        return False
+            try:
+                y = in_pos[1] - 1
+                for x in range(in_pos[0], in_pos[0] + self.figure_size[0]):
+                    if self.grid.raw_area[x][y] == self.me_id + 1:
+                        return True
+            except IndexError:
+                pass
+
+            try:
+                y = in_pos[1] + self.figure_size[1]
+                for x in range(in_pos[0], in_pos[0] + self.figure_size[0]):
+                    if self.grid.raw_area[x][y] == self.me_id + 1:
+                        return True
+            except IndexError:
+                pass
+
+            try:
+                x = in_pos[0] - 1
+                for y in range(in_pos[1], in_pos[1] + self.figure_size[1]):
+                    if self.grid.raw_area[x][y] == self.me_id + 1:
+                        return True
+            except IndexError:
+                pass
+
+            try:
+                x = in_pos[0] + self.figure_size[0]
+                for y in range(in_pos[1], in_pos[1] + self.figure_size[1]):
+                    if self.grid.raw_area[x][y] == self.me_id + 1:
+                        return True
+            except IndexError:
+                pass
+
+            return False
+
+        else:
+            return False
+
+    def can_draw(self):
+        in_pos = self.get_in_grid_pos()
+
+        if in_pos[0] >= 0 and in_pos[1] >= 0 and \
+                in_pos[0] + self.figure_size[0] < self.grid_data[1][0] + 1 \
+                and in_pos[1] + self.figure_size[1] < self.grid_data[1][1] + 1:
+            return True
+
+        else:
+            return False
 
     def get_in_grid_pos(self):
         mouse = pygame.mouse.get_pos()
-        a = [math.floor((self.grid_data[2][0]) * (mouse[0] // self.grid_data[2][0])),
-             math.floor((self.grid_data[2][1]) * (mouse[1] // self.grid_data[2][1]))]
+        a = [math.floor((mouse[0] - self.grid_data[0][0]) // self.grid_data[2][0]),
+             math.floor((mouse[1] - self.grid_data[0][1]) // self.grid_data[2][1])]
         return a
 
-    def thing(self):
-        return math.floor(self.figure_size[0] * self.grid_data[2][0]), \
-               math.floor(self.figure_size[1] * self.grid_data[2][1])
+    def get_figure(self):
+        return Rectangle(self.color, *self.mouse_figure)
 
-    @staticmethod
-    def get_mouse_pos():
-        return pygame.mouse.get_pos()
+    def rotate(self):
+        self.figure_size[0], self.figure_size[1] = self.figure_size[1], self.figure_size[0]
 
-    @staticmethod
-    def get_keyboard():
-        return pygame.key.get_pressed()
+    def new_step(self):
+        self.figure_size = [random.randint(1, self.max_sizes[0]),
+                            random.randint(1, self.max_sizes[1])]
 
-    @staticmethod
-    def get_mouse_keys():
-        return pygame.mouse.get_pressed()
-
-    @staticmethod
-    def get_mouse_focus():
-        return pygame.mouse.get_focused()
+    def check(self):
+        if self.mouse_figure[0] != self.get_in_grid_pos():
+            self.mouse_figure = [self.get_in_grid_pos(), self.figure_size]
 
 
-class NetServer:
-    connected = False
-    work = False
-    last_message = ''
+class NetPlayer(Player):
+    locked = False
 
-    fps = 60
-    clock = pygame.time.Clock()
+    def __init__(self, grid: Grid_of_game, game: NetGame, color, me_id, max_sizes):
+        super().__init__(grid, game, color, me_id, max_sizes)
 
-    def __init__(self):
-        self.sock = socket.socket()
+    def keyboard(self, event):
+        def skip_turn():
+            self.game.terminal.send('skip;')
+            self.game.step += 1
+            self.game.get_current_player()
+            self.mouse_figure = [self.get_in_grid_pos(), self.figure_size]
+            self.new_step()
 
-    def accept(self):
-        self.sock.bind(('', 9090))
-        self.sock.listen(1)
-        self.conn, addr = self.sock.accept()
-        self.connected = True
-        print('connected:', addr)
+        key_binds = {pygame.K_ESCAPE: skip_turn,
+                     pygame.K_r: self.rotate,
+                     pygame.K_F12: self.game.fill
+                     }
 
-    def working(self):
-        def data_tunnel(self):
-            while self.working:
-                data = self.conn.recv(1024 * 8)
-                if data == b'quit':
-                    self.stop()
-                self.last_message = data.decode("utf-8")
-                if pygame.key.get_pressed()[pygame.K_F11]:
-                    print('\r' + str(data), end='')
+        mouse_binds = [None,
+                       self.set,
+                       None,
+                       self.rotate,
+                       None,
+                       None,
+                       None,
+                       None]
 
-        tunnel_thread = threading.Thread(target=data_tunnel, args=[self])
-        tunnel_thread.start()
+        # print(event.button)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if mouse_binds[event.button] is not None:
+                mouse_binds[event.button]()
 
-    def stop(self):
-        self.conn.send(b'quit')
+        elif event.type == pygame.KEYDOWN:
+            if event.key in key_binds:
+                key_binds[event.key]()
 
-        self.conn.close()
-        self.sock.close()
+    def can_draw(self):
+        in_pos = self.get_in_grid_pos()
 
-    def get_mouse_pos(self):
-        return eval(self.last_message)['mouse'][0]
+        if in_pos[0] >= 0 and in_pos[1] >= 0 and \
+                in_pos[0] + self.figure_size[0] < self.grid_data[1][0] + 1 \
+                and in_pos[1] + self.figure_size[1] < self.grid_data[1][1] + 1 \
+                and not self.locked:
+            return True
 
-    def get_keyboard(self):
-        return eval(self.last_message)['keyboard']
+        else:
+            return False
 
-    def get_mouse_keys(self):
-        return eval(self.last_message)['mouse'][1]
+    def lock(self):
+        self.locked = True
 
-    def get_mouse_focus(self):
-        return eval(self.last_message)['mouse'][2]
-
-
-class NetClient:
-    @staticmethod
-    def get_mouse_pos():
-        return pygame.mouse.get_pos()
-
-    @staticmethod
-    def get_keyboard():
-        return pygame.key.get_pressed()
-
-    @staticmethod
-    def get_mouse_keys():
-        return pygame.mouse.get_pressed()
-
-    @staticmethod
-    def get_mouse_focus():
-        return pygame.mouse.get_focused()
-
+    def unlock(self):
+        self.locked = False
 
 def start_music():
     music_list = [r"Music\1.mp3", r"Music\2.mp3", r"Music\3.mp3", r"Music\4.mp3"]
@@ -884,8 +1117,8 @@ if __name__ == '__main__':
     colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
 
     grid_widget_size = (500, 500)
-    grid_size = (20, 20)
-    grid_pos = (70, 70)
+    grid_size = (40, 40)
+    grid_pos = (50, 50)
     lines = (False, True)
     players = (Player, Player)
     max_figure_size = (6, 6)
@@ -893,6 +1126,6 @@ if __name__ == '__main__':
     settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines]
 
     menu = MainMenu(settings)
-    start_music()
+    # start_music()
     while True:
         menu.mainloop()
