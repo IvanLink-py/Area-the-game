@@ -6,13 +6,26 @@ import random
 import time
 import socket
 import threading
+from ast import literal_eval
 
 import pygame
 
 pygame.init()
 pygame.font.init()
 
-IP = ('localhost', 9090)
+try:
+    ip_file = open('IP.txt', 'r')
+    IP = literal_eval(ip_file.read())
+    ip_file.close()
+except:
+    IP = ('localhost', 9090)
+    print('Ошибка при чтенни файла. Использованно значение поумолчанию.')
+
+    ip_file = open('IP.txt', 'w')
+    ip_file.write(str(IP))
+    ip_file.close()
+
+n = 1
 
 
 class Rectangle:
@@ -169,7 +182,9 @@ class Grid_of_game:
             instruction.append(sub)
 
         if menu.game.current_player.can_draw():
-            instruction.append(menu.game.current_player.get_figure().draw(self))
+            inst = instruction.append(menu.game.current_player.get_figure().draw(self))
+            if inst:
+                instruction.append(inst)
 
         if self.outlines:
             instruction.append((pygame.draw.lines, (
@@ -255,7 +270,8 @@ class Game:
                 instr += self.status_bar((620, 390), (20, 20), (True, True))
 
                 for i in instr:
-                    i[0](*i[1])
+                    if i is not None:
+                        i[0](*i[1])
 
                 pygame.display.update()
 
@@ -499,7 +515,7 @@ class ServerTerminal:
     def receiving(self):
         while self.work:
             try:
-                rcv_data = self.conn.recv(1024*4)
+                rcv_data = self.conn.recv(1024 * 4)
                 a = rcv_data
                 b = a.decode('utf-8')
                 c = b.split(';')
@@ -509,6 +525,7 @@ class ServerTerminal:
                     quit()
 
     def start_recv(self):
+        self.queue = []
         thread = threading.Thread(target=self.receiving)
         thread.start()
 
@@ -555,11 +572,15 @@ class ClientTerminal(ServerTerminal):
 
 
 class NetGame(Game):
+    enemy_figure_size = [3, 3]
+
     def __init__(self, terminal, place, players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines):
+        self.terminal = terminal
         super().__init__(players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines)
 
-        self.terminal = terminal
         self.players[not place].lock()
+        self.players[place].unlock()
+
 
     def encode_message(self, message):
         splinted = message.split(' ')
@@ -568,6 +589,12 @@ class NetGame(Game):
             self.set_mouse_figure(Rectangle(self.player_colors[self.step % 2],
                                             (int(splinted[1]), int(splinted[2])),
                                             (int(splinted[3]), int(splinted[4]))), True)
+
+        elif splinted[0] == 'rotate':
+            self.enemy_figure_size[0], self.enemy_figure_size[1] = self.enemy_figure_size[1], self.enemy_figure_size[0]
+
+        elif splinted[0] == 'new_step':
+            self.enemy_figure_size = [int(splinted[1]), int(splinted[2])]
 
         elif splinted[0] == 'fill':
             self.fill(True)
@@ -614,6 +641,7 @@ class NetGame(Game):
             if not self.end_game:
 
                 instr = self.grid.get_main_draw()
+                instr += self.status_bar((620, 390), (20, 20), (True, True))
 
                 for i in instr:
                     i[0](*i[1])
@@ -645,9 +673,14 @@ class NetGame(Game):
             menu.start_new_game()
 
         def orevuar():
+            self.terminal.work = False
             self.terminal.close()
             pygame.quit()
             quit()
+
+        restart_button = Button((200, 350), (200, 32), self.end_this_game_and_start_new, pygame.Color(255, 255, 255),
+                                pygame.Color(0, 200, 0),
+                                "Restart", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (70, 6))
 
         end_button = Button((350, 400), (200, 32), orevuar, pygame.Color(255, 255, 255), pygame.Color(200, 50, 50),
                             "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6))
@@ -680,6 +713,7 @@ class NetGame(Game):
             win.blit(des_text, (60, 220))
             # win.blit(end_description, (302,200))
 
+            restart_button.draw()
             end_button.draw()
             menu_button.draw()
 
@@ -691,6 +725,57 @@ class NetGame(Game):
                     pass
             self.clock.tick(self.fps)
 
+    def status_bar(self, pos, cell_size, lines):
+        bar_size = list((ci + 2 for ci in self.max_sizes))
+        figure_size = list((bar_size[ci] * cell_size[ci] for ci in range(2)))
+
+        instruction = [[pygame.draw.rect, (win, 0, (pos, figure_size))]]
+        if lines[1]:
+            instruction.append((pygame.draw.lines, (
+                win, 0x888888, True, (pos, (pos[0] + figure_size[0], pos[1]),
+                                      (pos[0] + figure_size[0],
+                                       pos[1] + figure_size[1]),
+                                      (pos[0], pos[1] + figure_size[1])))))
+
+            instruction.append((pygame.draw.lines, (
+                win, 0, True, ((pos[0] - 1, pos[1] - 1),
+                               (pos[0] + figure_size[0] + 1, pos[1] - 1),
+                               (pos[0] + figure_size[0] + 1,
+                                pos[1] + figure_size[1] + 1),
+                               (pos[0] - 1, pos[1] + figure_size[1] + 1)))))
+
+        if not self.current_player.locked:
+            figure = self.current_player.get_figure()
+        else:
+            figure = Rectangle(self.current_player.color, (0, 0), self.enemy_figure_size)
+
+        instruction.append((pygame.draw.rect, (win, figure.color,
+                                               ((pos[0] + cell_size[0], pos[1] + cell_size[1]),
+                                                (figure.x2 * cell_size[0], figure.y2 * cell_size[1])))))
+
+        if lines[0]:
+            for i in range(1, bar_size[0]):
+                instruction.append((pygame.draw.lines, (win, 0x888888, True, (
+                    (math.floor(pos[0] + cell_size[0] * i), pos[1]),
+                    (math.floor(pos[0] + cell_size[0] * i), pos[1] + figure_size[1])
+                ))))
+            for i in range(1, bar_size[1]):
+                instruction.append((pygame.draw.lines, (win, 0x888888, True, (
+                    (pos[0], math.floor(pos[1] + cell_size[1] * i)),
+                    (pos[0] + figure_size[0], math.floor(pos[1] + cell_size[1] * i))))))
+
+        return instruction
+
+    def end_this_game_and_start_new(self):
+        self.terminal.work = False
+        self.terminal.close()
+
+        if isinstance(self.terminal, ClientTerminal):
+            menu.mainloop()
+        else:
+            menu.server_loop()
+            menu.mainloop()
+
     def set_mouse_figure(self, figure, is_net=False):
         super().set_mouse_figure(figure)
         if not is_net:
@@ -699,11 +784,7 @@ class NetGame(Game):
     def fill(self, is_net=False):
         if not is_net:
             self.terminal.send('fill')
-        self.terminal.work = False
         super().fill()
-        self.terminal.close()
-
-
 
 
 class MainMenu:
@@ -899,20 +980,25 @@ class MainMenu:
             self.game.mainloop()
 
     def start_new_game(self, type_of_game=0, terminal=None):
+
+        Player.alone_figure = self.setting[8]
+
         if type_of_game == 0:
             self.setting[0] = (Player, Player)
-            self.game = Game(*self.setting)
+            self.game = Game(*self.setting[:-1])
 
         elif type_of_game == 1:
             self.setting[0] = (NetPlayer, NetPlayer)
-            self.game = NetGame(terminal, 0, *self.setting)
+            self.game = NetGame(terminal, 0, *self.setting[:-1])
 
         elif type_of_game == 2:
             self.setting[0] = (NetPlayer, NetPlayer)
-            self.game = NetGame(terminal, 1,  *self.setting)
+            self.game = NetGame(terminal, 1, *self.setting[:-1])
 
 
 class Player:
+    alone_figure = True
+
     def __init__(self, grid: Grid_of_game, game, color, me_id, max_sizes):
         self.grid_data = (grid.grid_pos, grid.grid_size, grid.cell_size)
         self.grid = grid
@@ -973,6 +1059,10 @@ class Player:
                 for y in range(in_pos[1], in_pos[1] + self.figure_size[1]):
                     if self.grid.raw_area[x][y] != 0:
                         return False
+
+            if self.alone_figure and self.figure_size == [1, 1]:
+                return True
+
             try:
                 y = in_pos[1] - 1
                 for x in range(in_pos[0], in_pos[0] + self.figure_size[0]):
@@ -1091,11 +1181,21 @@ class NetPlayer(Player):
         else:
             return False
 
+    def rotate(self):
+        super().rotate()
+        self.game.terminal.send('rotate;')
+
+    def new_step(self):
+        super().new_step()
+        self.game.terminal.send(f'new_step {self.figure_size[0]} {self.figure_size[1]};')
+
     def lock(self):
         self.locked = True
 
     def unlock(self):
         self.locked = False
+        self.game.terminal.send(f'new_step {self.figure_size[0]} {self.figure_size[1]};')
+
 
 def start_music():
     music_list = [r"Music\1.mp3", r"Music\2.mp3", r"Music\3.mp3", r"Music\4.mp3"]
@@ -1122,8 +1222,9 @@ if __name__ == '__main__':
     lines = (False, True)
     players = (Player, Player)
     max_figure_size = (6, 6)
+    alone_figures = False
 
-    settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines]
+    settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines, alone_figures]
 
     menu = MainMenu(settings)
     # start_music()
