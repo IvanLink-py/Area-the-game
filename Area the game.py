@@ -124,7 +124,7 @@ class Grid_of_game:
         self.column = grid_size[1]
 
         self.cell_size = (self.pix_width / self.column, self.pix_height / self.row)
-        self.is_mouse = False
+        self.is_mouse = True
 
         self.inlines = inlines
         self.outlines = outlines
@@ -182,10 +182,11 @@ class Grid_of_game:
         for sub in instructions[1]:
             instruction.append(sub)
 
-        if menu.game.current_player.can_draw():
-            inst = instruction.append(menu.game.current_player.get_figure().draw(self))
-            if inst:
-                instruction.append(inst)
+        if self.is_mouse:
+            if menu.game.current_player.can_draw():
+                inst = instruction.append(menu.game.current_player.get_figure().draw(self))
+                if inst is not None:
+                    instruction.append(inst)
 
         if self.outlines:
             instruction.append((pygame.draw.lines, (
@@ -271,7 +272,7 @@ class Game:
             if not self.end_game:
 
                 instr = self.grid.get_main_draw()
-                instr += self.status_bar((620, 390), (20, 20), (True, True))
+                instr += self.status_bar((620, 390), (160, 160), (True, True))
 
                 for i in instr:
                     if i is not None:
@@ -301,9 +302,9 @@ class Game:
         self.step += 1
         self.get_current_player()
 
-    def status_bar(self, pos, cell_size, lines):
+    def status_bar(self, pos, figure_size, lines):
         bar_size = list((ci + 2 for ci in self.max_sizes))
-        figure_size = list((bar_size[ci] * cell_size[ci] for ci in range(2)))
+        cell_size = list((figure_size[ci] / bar_size[ci] for ci in range(2)))
 
         instruction = [[pygame.draw.rect, (win, 0, (pos, figure_size))]]
         if lines[1]:
@@ -323,8 +324,8 @@ class Game:
         figure = menu.game.current_player.get_figure()
 
         instruction.append((pygame.draw.rect, (win, figure.color,
-                                               ((pos[0] + cell_size[0], pos[1] + cell_size[1]),
-                                                (figure.x2 * cell_size[0], figure.y2 * cell_size[1])))))
+                                               ((round(pos[0] + cell_size[0]), round(pos[1] + cell_size[1])),
+                                                (round(figure.x2 * cell_size[0]), round(figure.y2 * cell_size[1]))))))
 
         if lines[0]:
             for i in range(1, bar_size[0]):
@@ -458,9 +459,11 @@ class Game:
                     self.grid.raw_area[cell[0]][cell[1]] = players[0]
                     self.plus1score(players[0] - 1)
 
+                    self.back()
                     self.score_text()
 
                     instr = self.grid.get_main_draw()
+                    instr += self.status_bar((620, 390), (160, 160), (True, True))
 
                     for i in instr:
                         i[0](*i[1])
@@ -498,8 +501,9 @@ class ServerTerminal:
     work = True
     queue = []
 
-    def __init__(self):
+    def __init__(self, settings=None):
         self.sock = socket.socket()
+        self.settings = settings
 
     def send(self, message):
         self.conn.send(message.encode('utf-8'))
@@ -511,6 +515,9 @@ class ServerTerminal:
         print('connected:', addr)
         if target is not None:
             target()
+
+        if self.settings is not None:
+            self.send(str(self.settings))
 
     def accepting(self, target):
         accept_thread = threading.Thread(target=self.accept, args=[target])
@@ -548,14 +555,16 @@ class ServerTerminal:
 
 
 class ClientTerminal(ServerTerminal):
+    server_settings = {}
 
     def connect(self, target_connected=None, target_not=None):
         try:
             self.sock.connect(IP)
-        except ConnectionRefusedError:
+        except (ConnectionRefusedError, TimeoutError):
             if target_not is not None:
                 target_not()
         else:
+            self.server_settings = literal_eval(self.sock.recv(1024 * 4).decode('utf-8'))
             if target_connected is not None:
                 target_connected()
 
@@ -580,7 +589,14 @@ class NetGame(Game):
 
     def __init__(self, terminal, place, players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines):
         self.terminal = terminal
-        super().__init__(players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines)
+
+        if isinstance(terminal, ClientTerminal):
+            new_setting = self.terminal.server_settings
+            Player.alone_figure = new_setting['alone_figures']
+
+            super().__init__(players, grid_pos, new_setting['grid_size'], gws, new_setting['max_figure_size'], player_colors, inlines, outlines)
+        else:
+            super().__init__(players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines)
 
         self.players[not place].lock()
         self.players[place].unlock()
@@ -644,7 +660,7 @@ class NetGame(Game):
             if not self.end_game:
 
                 instr = self.grid.get_main_draw()
-                instr += self.status_bar((620, 390), (20, 20), (True, True))
+                instr += self.status_bar((620, 390), (160, 160), (True, True))
 
                 for i in instr:
                     i[0](*i[1])
@@ -728,9 +744,9 @@ class NetGame(Game):
                     pass
             self.clock.tick(self.fps)
 
-    def status_bar(self, pos, cell_size, lines):
+    def status_bar(self, pos, figure_size, lines):
         bar_size = list((ci + 2 for ci in self.max_sizes))
-        figure_size = list((bar_size[ci] * cell_size[ci] for ci in range(2)))
+        cell_size = list((figure_size[ci] / bar_size[ci] for ci in range(2)))
 
         instruction = [[pygame.draw.rect, (win, 0, (pos, figure_size))]]
         if lines[1]:
@@ -753,8 +769,8 @@ class NetGame(Game):
             figure = Rectangle(self.current_player.color, (0, 0), self.enemy_figure_size)
 
         instruction.append((pygame.draw.rect, (win, figure.color,
-                                               ((pos[0] + cell_size[0], pos[1] + cell_size[1]),
-                                                (figure.x2 * cell_size[0], figure.y2 * cell_size[1])))))
+                                               ((round(pos[0] + cell_size[0]), round(pos[1] + cell_size[1])),
+                                                (round(figure.x2 * cell_size[0]), round(figure.y2 * cell_size[1]))))))
 
         if lines[0]:
             for i in range(1, bar_size[0]):
@@ -915,7 +931,10 @@ class MainMenu:
             connecting = False
             start_game = True
 
-        terminal = ServerTerminal()
+        terminal = ServerTerminal({'grid_size': self.setting[2],
+                                   'max_figure_size': self.setting[4],
+                                   'alone_figures': self.setting[8]})
+
         terminal.accepting(target=successful)
 
         game_title_text = '"Area" the game'.upper()
@@ -1235,8 +1254,10 @@ if __name__ == '__main__':
         max_figure_size = (6, 6)
         alone_figures = True
         colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
+        play_logo = True
 
-        def_settings = {"grid_size": (40, 40),
+        def_settings = {'intro': True,
+                        "grid_size": (40, 40),
                         "lines": (False, True),
                         "max_figure_size": (6, 6),
                         "alone_figures": True,
@@ -1252,42 +1273,43 @@ if __name__ == '__main__':
         max_figure_size = settings_data['max_figure_size']
         alone_figures = settings_data['alone_figures']
         colorsRGBA = [pygame.Color(*settings_data['colorsRGBA'][0]), pygame.Color(*settings_data['colorsRGBA'][1])]
+        play_logo = settings_data['intro']
 
     settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines, alone_figures]
 
     menu = MainMenu(settings)
 
-    play_logo = True
-    t = 0
+    if play_logo:
+        t = 0
 
-    background = pygame.image.load('Images\\Background.png')
-    GDC = pygame.image.load('Images\\GDC.png')
+        background = pygame.image.load('Images\\Background.png')
+        GDC = pygame.image.load('Images\\GDC.png')
 
-    fps = 60
-    clock = pygame.time.Clock()
+        fps = 60
+        clock = pygame.time.Clock()
 
-    sur2 = pygame.Surface((800, 600))
-    sur1 = pygame.Surface((800, 600))
-    sur1.blit(background, (0, 0))
-    sur2.blit(GDC, (0, 0))
+        sur2 = pygame.Surface((800, 600))
+        sur1 = pygame.Surface((800, 600))
+        sur1.blit(background, (0, 0))
+        sur2.blit(GDC, (0, 0))
 
-    while play_logo:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                quit()
+        while play_logo:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    quit()
 
-        if t > 100:
-            sur2.set_alpha(t - 150)
-            win.blit(sur2, (0, 0))
-        else:
-            sur1.set_alpha(t)
-            win.blit(sur1, (0, 0))
+            if t > 50:
+                sur2.set_alpha(t - 50)
+                win.blit(sur2, (0, 0))
+            else:
+                sur1.set_alpha(t)
+                win.blit(sur1, (0, 0))
 
-        pygame.display.update()
-        t += 1
-        if t >= 360:
-            break
-        clock.tick(fps)
+            pygame.display.update()
+            t += 1
+            if t >= 360:
+                break
+            clock.tick(fps)
 
     # start_music()
 

@@ -1,1 +1,1 @@
-{'grid_size': (40, 40), 'lines': (False, True), 'max_figure_size': (6, 6), 'alone_figures': True, 'colorsRGBA': ((255, 160, 0, 1), (165, 45, 45, 1))}
+{'intro': True, 'grid_size': (40, 40), 'lines': (False, True), 'max_figure_size': (6, 6), 'alone_figures': True, 'colorsRGBA': ((255, 160, 0, 1), (165, 45, 45, 1))}
