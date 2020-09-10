@@ -6,6 +6,7 @@ import random
 import time
 import socket
 import threading
+import sys
 from ast import literal_eval
 
 import pygame
@@ -17,7 +18,7 @@ try:
     ip_file = open('IP.txt', 'r')
     IP = literal_eval(ip_file.read())
     ip_file.close()
-except:
+except FileNotFoundError:
     IP = ('localhost', 9090)
     print('Ошибка при чтенни файла. Использованно значение поумолчанию.')
 
@@ -25,7 +26,7 @@ except:
     ip_file.write(str(IP))
     ip_file.close()
 
-n = 1
+n = 0
 
 
 class Rectangle:
@@ -201,14 +202,14 @@ class Grid_of_game:
         return instruction
 
 
+def quit():
+    sys.exit()
+
+
 class Game:
     alone_one = True
     play = True
     end_game = False
-
-    scores1 = pygame.font.SysFont("Gouranga Cyrillic", 32)
-
-    scores2 = pygame.font.SysFont("Gouranga Cyrillic", 32)
 
     fps = 60
     clock = pygame.time.Clock()
@@ -236,6 +237,9 @@ class Game:
              range(len(players))))
 
         self.current_player = self.players[self.step % 2]
+        self.scores1 = pygame.font.SysFont("Gouranga Cyrillic", 32)
+
+        self.scores2 = pygame.font.SysFont("Gouranga Cyrillic", 32)
 
     def get_current_player(self):
         self.current_player = self.players[self.step % 2]
@@ -581,7 +585,6 @@ class NetGame(Game):
         self.players[not place].lock()
         self.players[place].unlock()
 
-
     def encode_message(self, message):
         splinted = message.split(' ')
 
@@ -851,7 +854,7 @@ class MainMenu:
 
         game_title_text = '"Area" the game'.upper()
         game_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-        game_title = game_title_font.render(game_title_text, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
+        game_title = game_title_font.render(game_title_text, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0, 0))
 
         play_offline_button = Button((20, 100), (200, 32), self.game_loop, pygame.Color(255, 255, 255),
                                      pygame.Color(0, 255, 0),
@@ -1210,23 +1213,83 @@ def start_music():
 
 if __name__ == '__main__':
 
-    win = pygame.display.set_mode((800, 600), pygame.SRCALPHA)  # размеры X и Y
-    pygame.display.set_icon(pygame.image.load("ico.png"))
+    win = pygame.display.set_mode((800, 600))  # размеры X и Y
+    try:
+        pygame.display.set_icon(pygame.image.load("Images\\ico.png"))
+    except pygame.error:
+        pass
     pygame.display.set_caption("Area")
 
-    colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
-
     grid_widget_size = (500, 500)
-    grid_size = (40, 40)
     grid_pos = (50, 50)
-    lines = (False, True)
-    players = (Player, Player)
-    max_figure_size = (6, 6)
-    alone_figures = False
+    players = ()
+
+    try:
+        settings_file = open('settings.txt', 'r', encoding='utf-8')
+        settings_data = literal_eval(settings_file.read())
+        settings_file.close()
+
+    except FileNotFoundError:
+        grid_size = (40, 40)
+        lines = (False, True)
+        max_figure_size = (6, 6)
+        alone_figures = True
+        colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
+
+        def_settings = {"grid_size": (40, 40),
+                        "lines": (False, True),
+                        "max_figure_size": (6, 6),
+                        "alone_figures": True,
+                        'colorsRGBA': ((255, 160, 0, 1), (165, 45, 45, 1))}
+
+        settings_file = open('settings.txt', 'w', encoding='utf-8')
+        settings_file.write(str(def_settings))
+        settings_file.close()
+
+    else:
+        grid_size = settings_data['grid_size']
+        lines = settings_data['lines']
+        max_figure_size = settings_data['max_figure_size']
+        alone_figures = settings_data['alone_figures']
+        colorsRGBA = [pygame.Color(*settings_data['colorsRGBA'][0]), pygame.Color(*settings_data['colorsRGBA'][1])]
 
     settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines, alone_figures]
 
     menu = MainMenu(settings)
+
+    play_logo = True
+    t = 0
+
+    background = pygame.image.load('Images\\Background.png')
+    GDC = pygame.image.load('Images\\GDC.png')
+
+    fps = 60
+    clock = pygame.time.Clock()
+
+    sur2 = pygame.Surface((800, 600))
+    sur1 = pygame.Surface((800, 600))
+    sur1.blit(background, (0, 0))
+    sur2.blit(GDC, (0, 0))
+
+    while play_logo:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+
+        if t > 100:
+            sur2.set_alpha(t - 150)
+            win.blit(sur2, (0, 0))
+        else:
+            sur1.set_alpha(t)
+            win.blit(sur1, (0, 0))
+
+        pygame.display.update()
+        t += 1
+        if t >= 360:
+            break
+        clock.tick(fps)
+
     # start_music()
+
     while True:
         menu.mainloop()
