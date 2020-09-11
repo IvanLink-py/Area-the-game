@@ -53,7 +53,7 @@ class Button:
     hover = False
 
     def __init__(self, pos1, pos2, target, color_reg, color_hov=None, text=None, text_color=None, font=None,
-                 font_size=None, text_correct=(10, -2), args=()):
+                 font_size=None, text_correct=(10, -2), args=(), texture=None):
         self.pos1 = pos1
         self.pos2 = pos2
 
@@ -69,6 +69,8 @@ class Button:
 
         self.text = text
 
+        self.texture = texture
+
     def check_hover(self):
         mouse = pygame.mouse.get_pos()
         if (self.pos1[0] < mouse[0] < self.pos1[0] + self.pos2[0]) and (
@@ -78,13 +80,17 @@ class Button:
             self.hover = False
 
     def get_draw(self):
-        if self.text is not None:
+        if self.texture is not None:
+            return win.blit, (self.texture, self.pos1)
+
+        elif self.text is not None:
             button_text = self.text_obj.render(self.text, 1, self.text_color, self.colors[self.hover])
             return [(pygame.draw.rect, (win, self.colors[self.hover], (self.pos1, self.pos2))),
                     (win.blit, (button_text, (math.floor(
                         self.pos1[0] + self.pos2[0] / 2 - len(self.text) * self.font_size / 2 + self.text_correct[0]),
                                               math.floor(self.pos1[1] + self.pos2[1] / 2 - self.font_size / 2 +
                                                          self.text_correct[1]))))]
+
         else:
             return pygame.draw.rect, (win, self.colors[self.hover], (self.pos1, self.pos2))
 
@@ -103,12 +109,21 @@ class Button:
 
     def draw(self):
         self.checker()
-        pygame.draw.rect(win, self.colors[self.hover], (self.pos1, self.pos2))
-        button_text = self.text_obj.render(self.text, 1, self.text_color, self.colors[self.hover])
+        if self.texture is not None:
+            if self.hover:
+                return win.blit(self.texture, (self.pos1[0]-5, self.pos1[1]-5))
+            else:
+                return win.blit(self.texture, self.pos1)
 
-        win.blit(button_text, (
-            math.floor(self.pos1[0] + self.pos2[0] / 2 - len(self.text) * self.font_size / 2 + self.text_correct[0]),
-            math.floor(self.pos1[1] + self.pos2[1] / 2 - self.font_size / 2 + self.text_correct[1])))
+
+        else:
+            pygame.draw.rect(win, self.colors[self.hover], (self.pos1, self.pos2))
+            button_text = self.text_obj.render(self.text, 1, self.text_color, self.colors[self.hover])
+
+            win.blit(button_text, (
+                math.floor(
+                    self.pos1[0] + self.pos2[0] / 2 - len(self.text) * self.font_size / 2 + self.text_correct[0]),
+                math.floor(self.pos1[1] + self.pos2[1] / 2 - self.font_size / 2 + self.text_correct[1])))
 
 
 class Grid_of_game:
@@ -594,7 +609,8 @@ class NetGame(Game):
             new_setting = self.terminal.server_settings
             Player.alone_figure = new_setting['alone_figures']
 
-            super().__init__(players, grid_pos, new_setting['grid_size'], gws, new_setting['max_figure_size'], player_colors, inlines, outlines)
+            super().__init__(players, grid_pos, new_setting['grid_size'], gws, new_setting['max_figure_size'],
+                             player_colors, inlines, outlines)
         else:
             super().__init__(players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines)
 
@@ -855,12 +871,14 @@ class MainMenu:
             nonlocal showed_menu
             start_server_button = Button((240, 140), (200, 32), self.server_loop, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
-                                         "Start Server", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6))
+                                         "Start Server", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
+                                         texture=pygame.image.load("Images\\Buttons\\Start server.png"))
 
             start_client_button = Button((460, 140), (200, 32), try_connect, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
                                          "Start Client", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
-                                         args=[self])
+                                         args=[self],
+                                         texture=pygame.image.load("Images\\Buttons\\Connect.png"))
 
             showed_menu = [start_server_button, start_client_button]
 
@@ -874,18 +892,22 @@ class MainMenu:
 
         play_offline_button = Button((20, 100), (200, 32), self.game_loop, pygame.Color(255, 255, 255),
                                      pygame.Color(0, 255, 0),
-                                     "Play Offline", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6))
+                                     "Play Offline", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
+                                     texture=pygame.image.load("Images\\Buttons\\Play offline.png"))
 
         play_online_button = Button((20, 140), (200, 32), show_online_menu, pygame.Color(255, 255, 255),
                                     pygame.Color(15, 192, 252),
-                                    "Play Online", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (90, 6))
+                                    "Play Online", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (90, 6),
+                                    texture=pygame.image.load("Images\\Buttons\\Play online.png"))
 
         setting_button = Button((20, 180), (200, 32), show_settings, pygame.Color(255, 255, 255),
                                 pygame.Color(102, 221, 170),
-                                "Settings", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6))
+                                "Settings", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6),
+                                texture=pygame.image.load("Images\\Buttons\\Settings.png"))
 
         quit_button = Button((20, 220), (200, 32), quit, pygame.Color(255, 255, 255), pygame.Color(255, 8, 0),
-                             "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (-25, 6))
+                             "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (-25, 6),
+                             texture=pygame.image.load("Images\\Buttons\\Quit.png"))
 
         buttons = [play_offline_button,
                    play_online_button,
@@ -894,9 +916,11 @@ class MainMenu:
 
         showed_menu = []
 
+        back = pygame.image.load("Images\\Background.png")
         while True:
-            win.fill(0)
-            win.blit(game_title, (300, 50))
+            win.blit(back, (0, 0))
+            # win.fill(0)
+            # win.blit(game_title, (300, 50))
 
             # pygame.draw.rect(win, pygame.Color(0, 0, 0), ((20, 100), (200, 40 * 3 + 32)))
             for button in buttons:
@@ -945,15 +969,18 @@ class MainMenu:
         ip_title = game_title_font.render(ip_address, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
 
         abort_button = Button((590, 560), (200, 32), stop, pygame.Color(255, 255, 255), pygame.Color(255, 8, 0),
-                              "Abort", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (30, 6))
+                              "Abort", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (30, 6),
+                                     texture=pygame.image.load("Images\\Buttons\\Stop.png"))
 
         buttons = [abort_button]
 
         t = 0
 
+        back = pygame.image.load("Images\\Background.png")
+
         while True:
-            win.fill(0)
-            win.blit(game_title, (300, 50))
+            win.blit(back, (0, 0))
+            # win.blit(game_title, (300, 50))
             win.blit(ip_title, (15, 570))
 
             if not start_game:
@@ -1255,11 +1282,13 @@ if __name__ == '__main__':
         alone_figures = True
         colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
         play_logo = True
+        play_music = True
 
         def_settings = {'intro': True,
+                        'music': True,
                         "grid_size": (40, 40),
                         "lines": (False, True),
-                        "max_figure_size": (6, 6),
+                        "max_figure_size": 6,
                         "alone_figures": True,
                         'colorsRGBA': ((255, 160, 0, 1), (165, 45, 45, 1))}
 
@@ -1270,10 +1299,11 @@ if __name__ == '__main__':
     else:
         grid_size = settings_data['grid_size']
         lines = settings_data['lines']
-        max_figure_size = settings_data['max_figure_size']
+        max_figure_size = (settings_data['max_figure_size'], settings_data['max_figure_size'])
         alone_figures = settings_data['alone_figures']
         colorsRGBA = [pygame.Color(*settings_data['colorsRGBA'][0]), pygame.Color(*settings_data['colorsRGBA'][1])]
         play_logo = settings_data['intro']
+        play_music = settings_data['music']
 
     settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines, alone_figures]
 
@@ -1282,7 +1312,7 @@ if __name__ == '__main__':
     if play_logo:
         t = 0
 
-        background = pygame.image.load('Images\\Background.png')
+        background = pygame.image.load('Images\\BackgroundINTRO.png')
         GDC = pygame.image.load('Images\\GDC.png')
 
         fps = 60
@@ -1307,11 +1337,12 @@ if __name__ == '__main__':
 
             pygame.display.update()
             t += 1
-            if t >= 360:
+            if t >= 200:
                 break
             clock.tick(fps)
 
-    # start_music()
+    if play_music:
+        start_music()
 
     while True:
         menu.mainloop()
