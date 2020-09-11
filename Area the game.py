@@ -14,20 +14,6 @@ import pygame
 pygame.init()
 pygame.font.init()
 
-try:
-    ip_file = open('IP.txt', 'r')
-    IP = literal_eval(ip_file.read())
-    ip_file.close()
-except FileNotFoundError:
-    IP = ('localhost', 9090)
-    print('Ошибка при чтенни файла. Использованно значение поумолчанию.')
-
-    ip_file = open('IP.txt', 'w')
-    ip_file.write(str(IP))
-    ip_file.close()
-
-n = 0
-
 
 class Rectangle:
     def __init__(self, color, pos1, size, text=None):
@@ -51,6 +37,7 @@ class Rectangle:
 
 class Button:
     hover = False
+    button_sound = pygame.mixer.Sound(r'Sounds/Effects/Button/Hover/03.wav')
 
     def __init__(self, pos1, pos2, target, color_reg, color_hov=None, text=None, text_color=None, font=None,
                  font_size=None, text_correct=(10, -2), args=(), texture=None):
@@ -75,6 +62,8 @@ class Button:
         mouse = pygame.mouse.get_pos()
         if (self.pos1[0] < mouse[0] < self.pos1[0] + self.pos2[0]) and (
                 self.pos1[1] < mouse[1] < self.pos1[1] + self.pos2[1]):
+            if not self.hover:
+                self.button_sound.play()
             self.hover = True
         else:
             self.hover = False
@@ -111,7 +100,7 @@ class Button:
         self.checker()
         if self.texture is not None:
             if self.hover:
-                return win.blit(self.texture, (self.pos1[0]-5, self.pos1[1]-5))
+                return win.blit(self.texture, (self.pos1[0] - 5, self.pos1[1] - 5))
             else:
                 return win.blit(self.texture, self.pos1)
 
@@ -162,9 +151,9 @@ class Grid_of_game:
             size_y = figure.y2 * self.cell_size[1]
             if figure.x1 > -1 and figure.x1 + figure.x2 < self.column + 1:
                 if figure.y1 > -1 and figure.y1 + figure.y2 < self.row + 1:
-                    return [pygame.draw.rect, (
+                    return [pygame.draw.rect, [
                         win, figure.color, (self.grid_pos[0] + math.floor(x1) + 1, math.floor(self.grid_pos[1] + y1),
-                                            math.floor(size_x) + 1, math.floor(size_y) + 1))]
+                                            math.floor(size_x) + 1, math.floor(size_y) + 1)]]
 
     def get_main_draw(self):
         instruction = []
@@ -198,10 +187,21 @@ class Grid_of_game:
             instruction.append(sub)
 
         if self.is_mouse:
-            if menu.game.current_player.can_draw():
-                inst = instruction.append(menu.game.current_player.get_figure().draw(self))
-                if inst is not None:
-                    instruction.append(inst)
+            if ghosts:
+                if menu.game.current_player.can_draw():
+                    mouse_object_surface = pygame.Surface((800, 600), pygame.SRCALPHA)
+                    figure = self.get_figure_draw(menu.game.current_player.get_figure())[1]
+                    figure[0] = mouse_object_surface
+                    figure[1] = pygame.Color(200, 200, 200, 150)
+
+                    pygame.draw.rect(*figure)
+                    instruction.append((mouse_object_surface, (0, 0)))
+
+            else:
+                if menu.game.current_player.can_draw():
+                    inst = instruction.append(menu.game.current_player.get_figure().draw(self))
+                    if inst is not None:
+                        instruction.append(inst)
 
         if self.outlines:
             instruction.append((pygame.draw.lines, (
@@ -291,7 +291,10 @@ class Game:
 
                 for i in instr:
                     if i is not None:
-                        i[0](*i[1])
+                        if isinstance(i[0], pygame.Surface):
+                            win.blit(i[0], i[1])
+                        else:
+                            i[0](*i[1])
 
                 pygame.display.update()
 
@@ -614,6 +617,8 @@ class NetGame(Game):
         else:
             super().__init__(players, grid_pos, grid_size, gws, max_sizes, player_colors, inlines, outlines)
 
+        self.place = place
+
         self.players[not place].lock()
         self.players[place].unlock()
 
@@ -679,7 +684,11 @@ class NetGame(Game):
                 instr += self.status_bar((620, 390), (160, 160), (True, True))
 
                 for i in instr:
-                    i[0](*i[1])
+                    if i is not None:
+                        if isinstance(i[0], pygame.Surface):
+                            win.blit(i[0], i[1])
+                        else:
+                            i[0](*i[1])
 
                 pygame.display.update()
 
@@ -689,7 +698,8 @@ class NetGame(Game):
                     quit_ = True
                     break
                 elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.KEYDOWN:
-                    self.current_player.keyboard(event)
+                    if self.current_player == self.players[self.place]:
+                        self.current_player.keyboard(event)
 
             if quit_:
                 break
@@ -886,27 +896,16 @@ class MainMenu:
             nonlocal showed_menu
             showed_menu = []
 
-        game_title_text = '"Area" the game'.upper()
-        game_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-        game_title = game_title_font.render(game_title_text, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0, 0))
-
         play_offline_button = Button((20, 100), (200, 32), self.game_loop, pygame.Color(255, 255, 255),
-                                     pygame.Color(0, 255, 0),
-                                     "Play Offline", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
                                      texture=pygame.image.load("Images\\Buttons\\Play offline.png"))
 
         play_online_button = Button((20, 140), (200, 32), show_online_menu, pygame.Color(255, 255, 255),
-                                    pygame.Color(15, 192, 252),
-                                    "Play Online", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (90, 6),
                                     texture=pygame.image.load("Images\\Buttons\\Play online.png"))
 
         setting_button = Button((20, 180), (200, 32), show_settings, pygame.Color(255, 255, 255),
-                                pygame.Color(102, 221, 170),
-                                "Settings", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6),
                                 texture=pygame.image.load("Images\\Buttons\\Settings.png"))
 
-        quit_button = Button((20, 220), (200, 32), quit, pygame.Color(255, 255, 255), pygame.Color(255, 8, 0),
-                             "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (-25, 6),
+        quit_button = Button((20, 220), (200, 32), quit, pygame.Color(255, 255, 255),
                              texture=pygame.image.load("Images\\Buttons\\Quit.png"))
 
         buttons = [play_offline_button,
@@ -919,10 +918,7 @@ class MainMenu:
         back = pygame.image.load("Images\\Background.png")
         while True:
             win.blit(back, (0, 0))
-            # win.fill(0)
-            # win.blit(game_title, (300, 50))
 
-            # pygame.draw.rect(win, pygame.Color(0, 0, 0), ((20, 100), (200, 40 * 3 + 32)))
             for button in buttons:
                 button.draw()
 
@@ -970,28 +966,28 @@ class MainMenu:
 
         abort_button = Button((590, 560), (200, 32), stop, pygame.Color(255, 255, 255), pygame.Color(255, 8, 0),
                               "Abort", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (30, 6),
-                                     texture=pygame.image.load("Images\\Buttons\\Stop.png"))
+                              texture=pygame.image.load("Images\\Buttons\\Stop.png"))
 
         buttons = [abort_button]
 
         t = 0
 
         back = pygame.image.load("Images\\Background.png")
+        whaiting_list = [pygame.image.load("Images\\Text\\Area server waiting\\01.png"),
+                         pygame.image.load("Images\\Text\\Area server waiting\\02.png"),
+                         pygame.image.load("Images\\Text\\Area server waiting\\03.png"),
+                         pygame.image.load("Images\\Text\\Area server waiting\\Succses.png")]
 
         while True:
             win.blit(back, (0, 0))
-            # win.blit(game_title, (300, 50))
             win.blit(ip_title, (15, 570))
 
             if not start_game:
-                waiting_text = f"Waiting{'.' * (t // 60)}"
+                win.blit(whaiting_list[t // 30], (350, 300))
             else:
-                waiting_text = "Connected"
+                win.blit(whaiting_list[3], (350, 280))
 
-            waiting = game_title_font.render(waiting_text, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
-            win.blit(waiting, (350, 300))
-
-            if t <= 350:
+            if t < 180 // 2 - 1:
                 t += 1
             else:
                 t = 0
@@ -1010,6 +1006,7 @@ class MainMenu:
                 break
 
             if not connecting:
+                time.sleep(2)
                 break
 
             self.clock.tick(self.fps)
@@ -1175,10 +1172,14 @@ class Player:
     def new_step(self):
         self.figure_size = [random.randint(1, self.max_sizes[0]),
                             random.randint(1, self.max_sizes[1])]
+        self.update()
+
+    def update(self):
+        self.mouse_figure = [self.get_in_grid_pos(), self.figure_size]
 
     def check(self):
         if self.mouse_figure[0] != self.get_in_grid_pos():
-            self.mouse_figure = [self.get_in_grid_pos(), self.figure_size]
+            self.update()
 
 
 class NetPlayer(Player):
@@ -1247,17 +1248,29 @@ class NetPlayer(Player):
 
 
 def start_music():
-    music_list = [r"Music\1.mp3", r"Music\2.mp3", r"Music\3.mp3", r"Music\4.mp3"]
+    music_list = ['1.mp3', '2.mp3', '3.mp3', '4.mp3']
     music_volume = [.2, .2, .2, .2]
 
     music_id = random.randint(0, 3)
-    music_file = music_list[music_id]
+    music_file = 'Sounds\\Music\\' + music_list[music_id]
     pygame.mixer.music.load(music_file)
     pygame.mixer.music.set_volume(music_volume[music_id])
     pygame.mixer.music.play(-1)
 
 
 if __name__ == '__main__':
+
+    try:
+        ip_file = open('IP.txt', 'r')
+        IP = literal_eval(ip_file.read())
+        ip_file.close()
+    except FileNotFoundError:
+        IP = ('localhost', 9090)
+        print('Ошибка при чтенни файла. Использованно значение поумолчанию.')
+
+        ip_file = open('IP.txt', 'w')
+        ip_file.write(str(IP))
+        ip_file.close()
 
     win = pygame.display.set_mode((800, 600))  # размеры X и Y
     try:
@@ -1283,10 +1296,12 @@ if __name__ == '__main__':
         colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
         play_logo = True
         play_music = True
+        ghosts = True
 
         def_settings = {'intro': True,
                         'music': True,
-                        "grid_size": (40, 40),
+                        'ghosts': True,
+                        "grid_size": 40,
                         "lines": (False, True),
                         "max_figure_size": 6,
                         "alone_figures": True,
@@ -1297,7 +1312,8 @@ if __name__ == '__main__':
         settings_file.close()
 
     else:
-        grid_size = settings_data['grid_size']
+        ghosts = settings_data['ghosts']
+        grid_size = [settings_data['grid_size'], settings_data['grid_size']]
         lines = settings_data['lines']
         max_figure_size = (settings_data['max_figure_size'], settings_data['max_figure_size'])
         alone_figures = settings_data['alone_figures']
