@@ -19,6 +19,41 @@ pygame.init()
 pygame.font.init()
 
 
+class SettingParameter:
+    boxes = [pygame.image.load(r'Images/Settings menu/Checkbox/00.png'),
+             pygame.image.load(r'Images/Settings menu/Checkbox/01.png')]
+
+    hover = False
+
+    def __init__(self, surface, pos, file, functions=(None, None), args=((), ()), state=False):
+        self.surface = surface
+        self.pos = pos
+        self.image = pygame.image.load(file)
+        self.fuctions = functions
+        self.args = args
+        self.state = state
+
+    def draw(self):
+        self.surface.blit(self.boxes[1 if self.state else 0], self.pos)
+        self.surface.blit(self.image, self.pos)
+
+    def check(self):
+        mouse = pygame.mouse.get_pos()
+        if True:
+            if self.pos[0] < mouse[0] < self.pos[0] + 36 and self.pos[1] < mouse[1] < self.pos[1] + 36:
+                self.hover = True
+            else:
+                self.hover = False
+
+    def check_event(self, event):
+        self.check()
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.hover:
+            if self.fuctions[self.state] is not None:
+                self.fuctions[self.state](self.args[self.state])
+
+            self.state = not self.state
+
+
 class Rectangle:
     def __init__(self, color, pos1, size, text=None):
         self.x1 = pos1[0]
@@ -170,7 +205,7 @@ class Grid_of_game:
             div = 255 - draw[1][1].r, 255 - draw[1][1].g, 255 - draw[1][1].b
             draw[1][1] = tuple(
                 (math.floor(draw[1][1][c] + div[c] * (1 - self.area_timers[id] / 120)) for c in range(3))) if \
-            self.area_timers[id] < 120 else draw[1][1]
+                self.area_timers[id] < 120 else draw[1][1]
         return draw
 
     def get_main_draw(self):
@@ -259,7 +294,7 @@ class Game:
 
         self.is_first_player_step = True
         self.grid = Grid_of_game(grid_pos, gws, grid_size, inlines, outlines)
-        
+
         self.grid_size = grid_size
 
         self.grid.area = [Rectangle(player_colors[0], (0, 0), (1, 1)),
@@ -533,7 +568,6 @@ class Game:
                     pygame.display.update()
                     t += 1
                     self.clock.tick(self.fps)
-
 
         self.end_game = True
         self.play = False
@@ -921,31 +955,27 @@ class MainMenu:
             start_server_button = Button((240, 140), (200, 32), self.server_loop, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
                                          "Start Server", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
-                                         texture=pygame.image.load("Images\\Buttons\\Start server.png"))
+                                         texture=pygame.image.load("Images\\Menu\\Start server.png"))
 
             start_client_button = Button((460, 140), (200, 32), try_connect, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
                                          "Start Client", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
                                          args=[self],
-                                         texture=pygame.image.load("Images\\Buttons\\Connect.png"))
+                                         texture=pygame.image.load("Images\\Menu\\Connect.png"))
 
             showed_menu = [start_server_button, start_client_button]
 
-        def show_settings():
-            nonlocal showed_menu
-            showed_menu = []
-
         play_offline_button = Button((20, 100), (200, 32), self.game_loop, pygame.Color(255, 255, 255),
-                                     texture=pygame.image.load("Images\\Buttons\\Play offline.png"))
+                                     texture=pygame.image.load("Images\\Menu\\Play offline.png"))
 
         play_online_button = Button((20, 140), (200, 32), show_online_menu, pygame.Color(255, 255, 255),
-                                    texture=pygame.image.load("Images\\Buttons\\Play online.png"))
+                                    texture=pygame.image.load("Images\\Menu\\Play online.png"))
 
-        setting_button = Button((20, 180), (200, 32), show_settings, pygame.Color(255, 255, 255),
-                                texture=pygame.image.load("Images\\Buttons\\Settings.png"))
+        setting_button = Button((20, 180), (200, 32), self.settings_loop, pygame.Color(255, 255, 255),
+                                texture=pygame.image.load("Images\\Menu\\Settings.png"))
 
         quit_button = Button((20, 220), (200, 32), quit, pygame.Color(255, 255, 255),
-                             texture=pygame.image.load("Images\\Buttons\\Quit.png"))
+                             texture=pygame.image.load("Images\\Menu\\Quit.png"))
 
         buttons = [play_offline_button,
                    play_online_button,
@@ -954,7 +984,7 @@ class MainMenu:
 
         showed_menu = []
 
-        back = pygame.image.load("Images\\Background.png")
+        back = pygame.image.load(r"Images\main\Background.png")
         while True:
             win.blit(back, (0, 0))
 
@@ -962,7 +992,7 @@ class MainMenu:
                 button.draw()
 
             for item in showed_menu:
-                if isinstance(item, Button):
+                if isinstance(item, (Button, SettingParameter)):
                     item.draw()
                 else:
                     item[0](*item[1], **item[2])
@@ -973,6 +1003,7 @@ class MainMenu:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     quit()
+
                 else:
                     pass
 
@@ -1002,11 +1033,11 @@ class MainMenu:
                  game_info_font.render('192.168.0.248', 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))]
 
         abort_button = Button((575, 545), (200, 32), stop, pygame.Color(255, 255, 255),
-                              texture=pygame.image.load("Images\\Buttons\\Stop.png"))
+                              texture=pygame.image.load("Images\\Menu\\Stop.png"))
 
         t = 0
 
-        back = pygame.image.load("Images\\Background server.png")
+        back = pygame.image.load("Images\\main\\Background server.png")
         waiting_list = [pygame.image.load("Images\\Text\\Area server waiting\\01.png"),
                         pygame.image.load("Images\\Text\\Area server waiting\\02.png"),
                         pygame.image.load("Images\\Text\\Area server waiting\\03.png"),
@@ -1019,7 +1050,7 @@ class MainMenu:
             win.blit(texts[2], (144, 499))
 
             if not start_game:
-                win.blit(waiting_list[t // 30], (350-10, 300-54))
+                win.blit(waiting_list[t // 30], (350 - 10, 300 - 54))
             else:
                 win.blit(waiting_list[3], (350, 280))
 
@@ -1052,6 +1083,110 @@ class MainMenu:
 
             while self.gaming:
                 self.game.mainloop()
+
+    def settings_loop(self):
+        def exit_settings():
+            save()
+            nonlocal show_settings
+            show_settings = False
+
+        show_settings = True
+
+        textures = {r"Images/Settings menu/Buttons/Alone.png": [alone_figures],
+                    r"Images/Settings menu/Buttons/External lines.png": [lines[1]],
+                    r"Images/Settings menu/Buttons/Ghosts.png": [ghosts],
+                    r"Images/Settings menu/Buttons/internal lines.png": [lines[0]],
+                    r"Images/Settings menu/Buttons/Intro.png": [play_logo],
+                    r"Images/Settings menu/Buttons/Music.png": [play_music],
+                    r"Images/Settings menu/Buttons/Sounds.png": [sounds],
+                    r"Images/Settings menu/Buttons/Lights.png": [lights]}
+
+        buttons = []
+
+        i = 0
+        for texture, data in textures.items():
+            buttons.append(SettingParameter(win, (20, 100 + 50 * i), texture, state=data[0]))
+            i += 1
+
+        def save():
+            global alone_figures
+            global lines
+            global ghosts
+            global play_logo
+            global play_music
+            global sounds
+            global lights
+
+            ms = play_music
+
+            nonlocal buttons
+            mb = buttons[:-1]
+
+            alone_figures = mb[0].state
+            lines = (mb[3].state, mb[1].state)
+            ghosts = mb[2].state
+            play_logo = mb[4].state
+            play_music = mb[5].state
+            sounds = mb[6].state
+            lights = mb[7].state
+
+            if play_music:
+                if not ms:
+                    start_music()
+            else:
+                pygame.mixer.music.stop()
+
+            settings_data = {'intro': play_logo,
+                             'music': play_music,
+                             'ghosts': ghosts,
+                             'lights': lights,
+                             'sounds': sounds,
+                             "grid_size": grid_size,
+                             "lines": lines,
+                             "max_figure_size": max_figure_size,
+                             "alone_figures": alone_figures,
+                             'colorsRGBA': colorsRGBA}
+
+            settings_file = open('settings.txt', 'w', encoding='utf-8')
+            settings_file.write(str(settings_data))
+            settings_file.close()
+
+            self.__init__(
+                [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines, alone_figures])
+
+        save_button = Button((20, 545), (200, 32), exit_settings, pygame.Color(255, 255, 255),
+                             texture=pygame.image.load("Images\\Settings menu\\Buttons\\Save.png"))
+
+        buttons.append(save_button)
+
+        back = pygame.image.load(r"Images/Settings menu/Settings back.png")
+        over = pygame.image.load(r"Images/Settings menu/Settings over.png")
+        t = 0
+        while show_settings:
+            win.blit(back, (-1600 + math.floor(t), 0))
+            win.blit(over, (0, 0))
+
+            for button in buttons:
+                button.draw()
+
+            pygame.display.update()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    quit()
+
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    for line in buttons:
+                        if isinstance(line, SettingParameter):
+                            line.check_event(event)
+
+                else:
+                    pass
+
+            t = (t + .5) % 1100
+
+            self.clock.tick(self.fps)
 
     def game_loop(self):
         self.start_new_game()
@@ -1309,7 +1444,7 @@ if __name__ == '__main__':
 
     win = pygame.display.set_mode((800, 600))  # размеры X и Y
     try:
-        pygame.display.set_icon(pygame.image.load("Images\\ico.png"))
+        pygame.display.set_icon(pygame.image.load("Images\\main\\ico.png"))
     except pygame.error:
         pass
     pygame.display.set_caption("Area")
@@ -1369,8 +1504,8 @@ if __name__ == '__main__':
     if play_logo:
         t = 0
 
-        background = pygame.image.load('Images\\BackgroundINTRO.png')
-        GDC = pygame.image.load('Images\\GDC.png')
+        background = pygame.image.load('Images\\main\\BackgroundINTRO.png')
+        GDC = pygame.image.load('Images\\main\\GDC.png')
 
         fps = 60
         clock = pygame.time.Clock()
