@@ -1141,9 +1141,9 @@ class MainMenu:
                              'ghosts': ghosts,
                              'lights': lights,
                              'sounds': sounds,
-                             "grid_size": grid_size,
+                             "grid_size": grid_size[0],
                              "lines": lines,
-                             "max_figure_size": max_figure_size,
+                             "max_figure_size": max_figure_size[0],
                              "alone_figures": alone_figures,
                              'colorsRGBA': colorsRGBA}
 
