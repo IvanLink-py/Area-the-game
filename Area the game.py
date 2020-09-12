@@ -11,6 +11,10 @@ from ast import literal_eval
 
 import pygame
 
+# Идеи уменьшить шанс ввпадения еденичкии в начале игры
+# Если добавим игру в стим, добавить достижение "Победидель по жизни", при выпении еденички в первом шаге
+
+
 pygame.init()
 pygame.font.init()
 
@@ -62,7 +66,7 @@ class Button:
         mouse = pygame.mouse.get_pos()
         if (self.pos1[0] < mouse[0] < self.pos1[0] + self.pos2[0]) and (
                 self.pos1[1] < mouse[1] < self.pos1[1] + self.pos2[1]):
-            if not self.hover:
+            if sounds and not self.hover:
                 self.button_sound.play()
             self.hover = True
         else:
@@ -134,10 +138,15 @@ class Grid_of_game:
         self.outlines = outlines
 
         self.area = []
+
+        if lights:
+            self.area_timers = []
+
         self.raw_area = [[0 for _ in range(grid_size[0])] for _ in range(grid_size[1])]
 
     def new_figure(self, figure: Rectangle, player_id):
         self.area.append(figure)
+        self.area_timers.append(0)
 
         for x in range(figure.x1, figure.x1 + figure.x2):
             for y in range(figure.y1, figure.y1 + figure.y2):
@@ -155,6 +164,15 @@ class Grid_of_game:
                         win, figure.color, (self.grid_pos[0] + math.floor(x1) + 1, math.floor(self.grid_pos[1] + y1),
                                             math.floor(size_x) + 1, math.floor(size_y) + 1)]]
 
+    def get_figure_draw_by_id(self, id):
+        draw = self.get_figure_draw(self.area[id])
+        if lights:
+            div = 255 - draw[1][1].r, 255 - draw[1][1].g, 255 - draw[1][1].b
+            draw[1][1] = tuple(
+                (math.floor(draw[1][1][c] + div[c] * (1 - self.area_timers[id] / 120)) for c in range(3))) if \
+            self.area_timers[id] < 120 else draw[1][1]
+        return draw
+
     def get_main_draw(self):
         instruction = []
         instructions = [[], []]
@@ -170,8 +188,9 @@ class Grid_of_game:
                     (self.grid_pos[0], math.floor(self.grid_pos[1] + self.cell_size[1] * i)),
                     (self.grid_pos[0] + self.figure_size[0], math.floor(self.grid_pos[0] + self.cell_size[1] * i))))))
 
-        for figure in self.area:
-            draw = self.get_figure_draw(figure)
+        for figure_id in range(len(self.area)):
+            figure = self.area[figure_id]
+            draw = self.get_figure_draw_by_id(figure_id)
             if draw is not None:
                 if figure.color == colorsRGBA[0]:
                     instructions[0].append(draw)
@@ -179,6 +198,10 @@ class Grid_of_game:
                     instructions[1].append(draw)
                 else:
                     instructions[0].append(draw)
+
+        if lights:
+            for figure in range(len(self.area_timers)):
+                self.area_timers[figure] += 1
 
         for sub in instructions[0]:
             instruction.append(sub)
@@ -219,6 +242,7 @@ class Grid_of_game:
 
 
 def quit():
+    pygame.quit()
     sys.exit()
 
 
@@ -235,12 +259,16 @@ class Game:
 
         self.is_first_player_step = True
         self.grid = Grid_of_game(grid_pos, gws, grid_size, inlines, outlines)
+        
+        self.grid_size = grid_size
 
         self.grid.area = [Rectangle(player_colors[0], (0, 0), (1, 1)),
                           Rectangle(player_colors[1], (self.grid.column - 1, self.grid.row - 1), (1, 1))]
 
         self.grid.raw_area[0][0] = 1
         self.grid.raw_area[self.grid.column - 1][self.grid.row - 1] = 2
+
+        self.grid.area_timers = [0, 0]
 
         self.max_sizes = max_sizes
 
@@ -449,9 +477,9 @@ class Game:
                 for j in range(len(self.grid.raw_area[i])):
                     if self.grid.raw_area[i][j] == 0:
                         cell = (i, j)
-                        sides = [0 if cell[0] == grid_size[0] - 1 else self.grid.raw_area[cell[0] + 1][cell[1]],
+                        sides = [0 if cell[0] == self.grid_size[0] - 1 else self.grid.raw_area[cell[0] + 1][cell[1]],
                                  0 if cell[0] == 0 else self.grid.raw_area[cell[0] - 1][cell[1]],
-                                 0 if cell[1] == grid_size[1] - 1 else self.grid.raw_area[cell[0]][cell[1] + 1],
+                                 0 if cell[1] == self.grid_size[1] - 1 else self.grid.raw_area[cell[0]][cell[1] + 1],
                                  0 if cell[1] == 0 else self.grid.raw_area[cell[0]][cell[1] - 1]]
                         if any(sides):
                             _empty_cells.append((i, j, sides))
@@ -463,10 +491,9 @@ class Game:
                 empty_cells_count = len(empty_cells)
                 cell_id = random.randint(0, empty_cells_count - 1)
                 cell = empty_cells[cell_id]
-                global grid_size
-                sides = [0 if cell[0] == grid_size[0] - 1 else self.grid.raw_area[cell[0] + 1][cell[1]],
+                sides = [0 if cell[0] == self.grid_size[0] - 1 else self.grid.raw_area[cell[0] + 1][cell[1]],
                          0 if cell[0] == 0 else self.grid.raw_area[cell[0] - 1][cell[1]],
-                         0 if cell[1] == grid_size[1] - 1 else self.grid.raw_area[cell[0]][cell[1] + 1],
+                         0 if cell[1] == self.grid_size[1] - 1 else self.grid.raw_area[cell[0]][cell[1] + 1],
                          0 if cell[1] == 0 else self.grid.raw_area[cell[0]][cell[1] - 1]]
 
                 # sides = [random.randint(1,2),random.randint(1,2),random.randint(1,2),random.randint(1,2)]
@@ -475,6 +502,7 @@ class Game:
                     players = [side for side in sides if side]
                     self.grid.area.append(Rectangle(colorsRGBA[players[0] - 1], cell, (1, 1)))
                     self.grid.raw_area[cell[0]][cell[1]] = players[0]
+                    self.grid.area_timers.append(0)
                     self.plus1score(players[0] - 1)
 
                     self.back()
@@ -491,7 +519,22 @@ class Game:
                     empty_cells = get_empty()
                 pygame.event.get()
             else:
-                time.sleep(2)
+                t = 0
+                while t < 120:
+                    self.back()
+                    self.score_text()
+
+                    instr = self.grid.get_main_draw()
+                    instr += self.status_bar((620, 390), (160, 160), (True, True))
+
+                    for i in instr:
+                        i[0](*i[1])
+
+                    pygame.display.update()
+                    t += 1
+                    self.clock.tick(self.fps)
+
+
         self.end_game = True
         self.play = False
 
@@ -568,8 +611,11 @@ class ServerTerminal:
             return []
 
     def close(self):
-        self.conn.close()
-        self.sock.close()
+        try:
+            self.conn.close()
+            self.sock.close()
+        except ConnectionResetError:
+            pass
 
 
 class ClientTerminal(ServerTerminal):
@@ -660,7 +706,7 @@ class NetGame(Game):
 
             for message in self.terminal.get_queue():
                 if message:
-                    print(message)
+                    # print(message)
                     self.encode_message(message)
 
             self.back()
@@ -844,12 +890,10 @@ class MainMenu:
 
             def try_connect(self):
                 def start():
-                    game_title_text = 'Connected'.upper()
-                    game_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-                    sucs_title = game_title_font.render(game_title_text, 1, pygame.Color(0, 200, 0),
-                                                        pygame.Color(0, 0, 0))
+                    fine_image = pygame.image.load(r'Images/Text/Area server waiting/Successful.png')
 
-                    win.blit(sucs_title, (480, 180))
+                    win.blit(fine_image, (500, 125))
+
                     pygame.display.update()
 
                     time.sleep(2)
@@ -862,14 +906,9 @@ class MainMenu:
                         self.game.mainloop()
 
                 def fail():
-                    game_title_text = 'Connection fail'.upper()
-                    game_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-                    fail_title = game_title_font.render(game_title_text, 1, pygame.Color(200, 0, 0),
-                                                        pygame.Color(0, 0, 0))
+                    fail_image = pygame.image.load(r'Images/Text/Area server waiting/Fail.png')
 
-                    win.blit(fail_title, (480, 145))
-                    # nonlocal start_client_button
-                    # start_client_button.draw()
+                    win.blit(fail_image, (500, 125))
 
                     pygame.display.update()
 
@@ -957,43 +996,39 @@ class MainMenu:
 
         terminal.accepting(target=successful)
 
-        game_title_text = '"Area" the game'.upper()
-        game_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-        game_title = game_title_font.render(game_title_text, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
+        game_info_font = pygame.font.SysFont("Myriad Pro", 24)
+        texts = [game_info_font.render(IP[0], 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0)),
+                 game_info_font.render(str(IP[1]), 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0)),
+                 game_info_font.render('192.168.0.248', 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))]
 
-        ip_address = f"{IP[0]}:{IP[1]}"
-        ip_title = game_title_font.render(ip_address, 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))
-
-        abort_button = Button((590, 560), (200, 32), stop, pygame.Color(255, 255, 255), pygame.Color(255, 8, 0),
-                              "Abort", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (30, 6),
+        abort_button = Button((575, 545), (200, 32), stop, pygame.Color(255, 255, 255),
                               texture=pygame.image.load("Images\\Buttons\\Stop.png"))
-
-        buttons = [abort_button]
 
         t = 0
 
-        back = pygame.image.load("Images\\Background.png")
-        whaiting_list = [pygame.image.load("Images\\Text\\Area server waiting\\01.png"),
-                         pygame.image.load("Images\\Text\\Area server waiting\\02.png"),
-                         pygame.image.load("Images\\Text\\Area server waiting\\03.png"),
-                         pygame.image.load("Images\\Text\\Area server waiting\\Succses.png")]
+        back = pygame.image.load("Images\\Background server.png")
+        waiting_list = [pygame.image.load("Images\\Text\\Area server waiting\\01.png"),
+                        pygame.image.load("Images\\Text\\Area server waiting\\02.png"),
+                        pygame.image.load("Images\\Text\\Area server waiting\\03.png"),
+                        pygame.image.load("Images\\Text\\Area server waiting\\Successful.png")]
 
         while True:
             win.blit(back, (0, 0))
-            win.blit(ip_title, (15, 570))
+            win.blit(texts[0], (120, 525))
+            win.blit(texts[1], (78, 553))
+            win.blit(texts[2], (144, 499))
 
             if not start_game:
-                win.blit(whaiting_list[t // 30], (350, 300))
+                win.blit(waiting_list[t // 30], (350-10, 300-54))
             else:
-                win.blit(whaiting_list[3], (350, 280))
+                win.blit(waiting_list[3], (350, 280))
 
             if t < 180 // 2 - 1:
                 t += 1
             else:
                 t = 0
 
-            for button in buttons:
-                button.draw()
+            abort_button.draw()
             pygame.display.update()
 
             for event in pygame.event.get():
@@ -1002,11 +1037,9 @@ class MainMenu:
                     quit()
 
             if start_game:
-                time.sleep(2)
                 break
 
             if not connecting:
-                time.sleep(2)
                 break
 
             self.clock.tick(self.fps)
@@ -1014,6 +1047,8 @@ class MainMenu:
         if start_game:
             self.start_new_game(type_of_game=1, terminal=terminal)
             self.gaming = True
+
+            time.sleep(2)
 
             while self.gaming:
                 self.game.mainloop()
@@ -1297,10 +1332,14 @@ if __name__ == '__main__':
         play_logo = True
         play_music = True
         ghosts = True
+        lights = True
+        sounds = True
 
         def_settings = {'intro': True,
                         'music': True,
                         'ghosts': True,
+                        'lights': True,
+                        'sounds': True,
                         "grid_size": 40,
                         "lines": (False, True),
                         "max_figure_size": 6,
@@ -1319,7 +1358,9 @@ if __name__ == '__main__':
         alone_figures = settings_data['alone_figures']
         colorsRGBA = [pygame.Color(*settings_data['colorsRGBA'][0]), pygame.Color(*settings_data['colorsRGBA'][1])]
         play_logo = settings_data['intro']
+        lights = settings_data['lights']
         play_music = settings_data['music']
+        sounds = settings_data['sounds']
 
     settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines, alone_figures]
 
