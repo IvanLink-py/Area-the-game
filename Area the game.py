@@ -14,7 +14,6 @@ import pygame
 # Идеи уменьшить шанс ввпадения еденичкии в начале игры
 # Если добавим игру в стим, добавить достижение "Победидель по жизни", при выпении еденички в первом шаге
 
-
 pygame.init()
 pygame.font.init()
 
@@ -76,6 +75,7 @@ class Rectangle:
 
 class Button:
     hover = False
+    pressed = False
     button_sound = pygame.mixer.Sound(r'Sounds/Effects/Button/Hover/03.wav')
 
     def __init__(self, pos1, pos2, target, color_reg, color_hov=None, text=None, text_color=None, font=None,
@@ -125,11 +125,13 @@ class Button:
     def check_click(self):
         if self.target is not None:
             mouse = pygame.mouse.get_pos()
-            if (self.pos1[0] < mouse[0] < self.pos1[0] + self.pos2[0]) and (
-                    self.pos1[1] < mouse[1] < self.pos1[1] + self.pos2[1]) and (
-                    pygame.mouse.get_pressed()[0]):
-                if pygame.mouse.get_pressed()[0]:
+            if pygame.mouse.get_pressed()[0]:
+                if (self.pos1[0] < mouse[0] < self.pos1[0] + self.pos2[0]) and (
+                        self.pos1[1] < mouse[1] < self.pos1[1] + self.pos2[1]) and not self.pressed:
                     self.target(*self.args)
+                self.pressed = True
+            else:
+                self.pressed = False
 
     def checker(self):
         self.check_hover()
@@ -137,12 +139,12 @@ class Button:
 
     def draw(self):
         self.checker()
+
         if self.texture is not None:
             if self.hover:
                 return win.blit(self.texture, (self.pos1[0] - 5, self.pos1[1] - 5))
             else:
                 return win.blit(self.texture, self.pos1)
-
 
         else:
             pygame.draw.rect(win, self.colors[self.hover], (self.pos1, self.pos2))
@@ -202,10 +204,10 @@ class Grid_of_game:
     def get_figure_draw_by_id(self, id):
         draw = self.get_figure_draw(self.area[id])
         if lights:
-            div = 255 - draw[1][1].r, 255 - draw[1][1].g, 255 - draw[1][1].b
+            div = draw[1][1].r, draw[1][1].g, draw[1][1].b
             draw[1][1] = tuple(
-                (math.floor(draw[1][1][c] + div[c] * (1 - self.area_timers[id] / 120)) for c in range(3))) if \
-                self.area_timers[id] < 120 else draw[1][1]
+                (math.floor(draw[1][1][c] - div[c] * (1 - self.area_timers[id] / 30)) for c in range(3))) if \
+                self.area_timers[id] < 30 else draw[1][1]
         return draw
 
     def get_main_draw(self):
@@ -277,7 +279,6 @@ class Grid_of_game:
 
 
 def quit():
-    pygame.quit()
     sys.exit()
 
 
@@ -285,6 +286,7 @@ class Game:
     alone_one = True
     play = True
     end_game = False
+    can_continue = False
 
     fps = 60
     clock = pygame.time.Clock()
@@ -325,9 +327,10 @@ class Game:
 
     def mainloop(self):
         self.back = self.gen_bg()
-        quit_ = False
         click_delay = 20
         can_click = False
+
+        self.can_continue = False
 
         self.get_current_player()
 
@@ -364,18 +367,22 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.play = False
-                    quit_ = True
+                    self.can_continue = True
                     break
-                elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.KEYDOWN:
-                    self.current_player.keyboard(event)
 
-            if quit_:
-                break
+                elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.KEYDOWN:
+
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        self.play = False
+                        self.can_continue = True
+                        break
+
+                    else:
+                        self.current_player.keyboard(event)
 
             self.clock.tick(self.fps)
 
-        else:
-            self.show_end_msg()
+        self.show_end_msg()
 
     def set_mouse_figure(self, figure):
         self.grid.new_figure(figure, self.step % 2)
@@ -424,49 +431,62 @@ class Game:
     def show_end_msg(self):
         self.end_msg = True
 
+        def continue_game():
+            self.play = True
+            self.end_msg = False
+
         def go_to_menu():
             self.end_msg = False
             menu.gaming = False
-            menu.start_new_game()
+            if isinstance(self, NetGame):
+                self.terminal.send('quit')
 
-        def orevuar():
-            pygame.quit()
+        def over():
+            if isinstance(self, NetGame):
+                self.terminal.send('quit')
+
             quit()
 
-        restart_button = Button((200, 350), (200, 32), self.end_this_game_and_start_new, pygame.Color(255, 255, 255),
+        restart_button = Button((350, 350), (200, 32),
+                                self.end_this_game_and_start_new, pygame.Color(255, 255, 255),
                                 pygame.Color(0, 200, 0),
-                                "Restart", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (70, 6))
+                                "Restart", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (70, 6),
+                                texture=pygame.image.load(r'Images/End message/Restart.png'))
 
-        end_button = Button((350, 400), (200, 32), orevuar, pygame.Color(255, 255, 255), pygame.Color(200, 50, 50),
-                            "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6))
+        end_button = Button((350, 400), (200, 32), over, pygame.Color(255, 255, 255), pygame.Color(200, 50, 50),
+                            "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6),
+                            texture=pygame.image.load(r'Images/End message/Quit.png'))
 
         menu_button = Button((55, 400), (200, 32), go_to_menu, pygame.Color(255, 255, 255), pygame.Color(100, 100, 255),
-                             "Back to menu", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (120, 6))
+                             "Back to menu", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (120, 6),
+                             texture=pygame.image.load(r'Images/End message/Back.png'))
 
-        end_window = ((20, 150), (555, 300))
-        shadow = ((25, 155), (555, 300))
-
-        title = 'The end'
-        description = 'Thanks for play'
-
-        end_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-        end_desc_font = pygame.font.SysFont("Gouranga Cyrillic", 16)
-
-        title_text = end_title_font.render(title, 1, pygame.Color(200, 200, 200), pygame.Color(88, 88, 88))
-        des_text = end_desc_font.render(description, 1, pygame.Color(200, 200, 200), pygame.Color(88, 88, 88))
+        continue_button = Button((55, 350), (200, 32), continue_game, pygame.Color(255, 255, 255),
+                                 pygame.Color(0, 200, 0),
+                                 "Continue", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (70, 6),
+                                 texture=pygame.image.load(r'Images/End message/Continue.png'))
 
         instr = self.grid.get_main_draw()
+
         for i in instr:
-            i[0](*i[1])
+            if i is not None:
+                if isinstance(i[0], pygame.Surface):
+                    win.blit(i[0], i[1])
+                else:
+                    i[0](*i[1])
+
         pygame.display.update()
 
-        while self.end_msg:
-            pygame.draw.rect(win, pygame.Color(20, 20, 20), shadow)
-            pygame.draw.rect(win, pygame.Color(88, 88, 88), end_window)
+        if self.can_continue:
+            end_background = pygame.image.load(r'Images/End message/Background2.png')
+        else:
+            end_background = pygame.image.load(r'Images/End message/Background.png')
 
-            win.blit(title_text, (60, 180))
-            win.blit(des_text, (60, 220))
-            # win.blit(end_description, (302,200))
+        while self.end_msg:
+            win.blit(end_background, (20, 150))
+
+            if self.can_continue:
+                continue_button.draw()
 
             restart_button.draw()
             end_button.draw()
@@ -531,7 +551,7 @@ class Game:
                          0 if cell[1] == self.grid_size[1] - 1 else self.grid.raw_area[cell[0]][cell[1] + 1],
                          0 if cell[1] == 0 else self.grid.raw_area[cell[0]][cell[1] - 1]]
 
-                # sides = [random.randint(1,2),random.randint(1,2),random.randint(1,2),random.randint(1,2)]
+                # sides = [random.randint(ignored,2),random.randint(ignored,2),random.randint(ignored,2),random.randint(ignored,2)]
 
                 if any(sides):
                     players = [side for side in sides if side]
@@ -598,42 +618,48 @@ class ServerTerminal:
 
     def __init__(self, settings=None):
         self.sock = socket.socket()
+        self.sock.setblocking(False)
+
+        self.bind()
+
         self.settings = settings
+
+    def bind(self):
+        if not isinstance(self, ClientTerminal):
+            self.sock.bind(('', IP[1]))
+            self.sock.listen(1)
 
     def send(self, message):
         self.conn.send(message.encode('utf-8'))
 
     def accept(self, target=None):
-        self.sock.bind(('', IP[1]))
-        self.sock.listen(1)
-        self.conn, addr = self.sock.accept()
-        print('connected:', addr)
-        if target is not None:
-            target()
+        try:
+            self.conn, address = self.sock.accept()
 
-        if self.settings is not None:
-            self.send(str(self.settings))
+        except socket.error:
+            pass
 
-    def accepting(self, target):
-        accept_thread = threading.Thread(target=self.accept, args=[target])
-        accept_thread.start()
+        else:
+            print('connected:', address)
+            if target is not None:
+                target()
 
-    def receiving(self):
-        while self.work:
-            try:
-                rcv_data = self.conn.recv(1024 * 4)
-                a = rcv_data
-                b = a.decode('utf-8')
-                c = b.split(';')
-                self.queue.extend(c)
-            except (ConnectionAbortedError, ConnectionResetError):
-                if self.work:
-                    quit()
+            if self.settings is not None:
+                self.send(str(self.settings))
 
-    def start_recv(self):
-        self.queue = []
-        thread = threading.Thread(target=self.receiving)
-        thread.start()
+    def receive(self):
+        try:
+            rcv_data = self.conn.recv(1024)
+            a = rcv_data
+            b = a.decode('utf-8')
+            c = b.split(';')
+            self.queue.extend(c)
+
+        except (ConnectionAbortedError, ConnectionResetError):
+            self.sock.close()
+
+        except socket.error:
+            pass
 
     def get_queue(self):
         if self.queue:
@@ -645,38 +671,52 @@ class ServerTerminal:
             return []
 
     def close(self):
-        try:
-            self.conn.close()
-            self.sock.close()
-        except ConnectionResetError:
-            pass
+        self.sock.close()
+        self.conn.close()
 
 
 class ClientTerminal(ServerTerminal):
     server_settings = {}
+    connecting_state = False
 
-    def connect(self, target_connected=None, target_not=None):
+    def connect(self, target_connected=None, target_not=None, ip=('localhost', 9090)):
         try:
-            self.sock.connect(IP)
+            self.sock.setblocking(True)
+            print(ip)
+            self.sock.connect(ip)
         except (ConnectionRefusedError, TimeoutError):
             if target_not is not None:
                 target_not()
+
+        # except socket.error:
+        #     pass
+
         else:
             self.server_settings = literal_eval(self.sock.recv(1024 * 4).decode('utf-8'))
+            self.sock.setblocking(False)
             if target_connected is not None:
                 target_connected()
+                self.connecting_state = False
+
+    def connecting(self, target_connected=None, target_not=None):
+        if not self.connecting_state:
+            self.connecting_state = True
+            connect_thread = threading.Thread(target=self.connect, args=(target_connected, target_not, IP))
+            connect_thread.start()
 
     def send(self, message):
         self.sock.send(message.encode('utf-8'))
 
-    def receiving(self):
-        while self.work:
-            try:
-                rcv_data = self.sock.recv(1024 * 4)
-                self.queue.extend(rcv_data.decode('utf-8').split(';'))
-            except (ConnectionAbortedError, ConnectionResetError):
-                if self.work:
-                    quit()
+    def receive(self):
+        try:
+            rcv_data = self.sock.recv(1024)
+            self.queue.extend(rcv_data.decode('utf-8').split(';'))
+        except (ConnectionAbortedError, ConnectionResetError):
+            if self.work:
+                quit()
+
+        except socket.error:
+            pass
 
     def close(self):
         self.sock.close()
@@ -713,6 +753,10 @@ class NetGame(Game):
         elif splinted[0] == 'rotate':
             self.enemy_figure_size[0], self.enemy_figure_size[1] = self.enemy_figure_size[1], self.enemy_figure_size[0]
 
+        elif splinted[0] == 'quit':
+            self.can_continue = False
+            self.play = False
+
         elif splinted[0] == 'new_step':
             self.enemy_figure_size = [int(splinted[1]), int(splinted[2])]
 
@@ -734,9 +778,9 @@ class NetGame(Game):
 
         self.get_current_player()
 
-        self.terminal.start_recv()
-
         while self.play:
+
+            self.terminal.receive()
 
             for message in self.terminal.get_queue():
                 if message:
@@ -775,80 +819,26 @@ class NetGame(Game):
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.play = False
-                    quit_ = True
+                    self.can_continue = True
                     break
+
                 elif event.type == pygame.MOUSEBUTTONDOWN or event.type == pygame.KEYDOWN:
-                    if self.current_player == self.players[self.place]:
-                        self.current_player.keyboard(event)
+
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        self.play = False
+                        self.can_continue = True
+                        break
+
+                    else:
+                        if not self.current_player.locked:
+                            self.current_player.keyboard(event)
 
             if quit_:
                 break
 
             self.clock.tick(self.fps)
 
-        else:
-            self.show_end_msg()
-
-    def show_end_msg(self):
-        self.end_msg = True
-
-        def go_to_menu():
-            self.end_msg = False
-            menu.gaming = False
-            menu.start_new_game()
-
-        def orevuar():
-            self.terminal.work = False
-            self.terminal.close()
-            pygame.quit()
-            quit()
-
-        restart_button = Button((200, 350), (200, 32), self.end_this_game_and_start_new, pygame.Color(255, 255, 255),
-                                pygame.Color(0, 200, 0),
-                                "Restart", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (70, 6))
-
-        end_button = Button((350, 400), (200, 32), orevuar, pygame.Color(255, 255, 255), pygame.Color(200, 50, 50),
-                            "Quit", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (40, 6))
-
-        menu_button = Button((55, 400), (200, 32), go_to_menu, pygame.Color(255, 255, 255), pygame.Color(100, 100, 255),
-                             "Back to menu", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (120, 6))
-
-        end_window = ((20, 150), (555, 300))
-        shadow = ((25, 155), (555, 300))
-
-        title = 'The end'
-        description = 'Thanks for play'
-
-        end_title_font = pygame.font.SysFont("Gouranga Cyrillic", 32)
-        end_desc_font = pygame.font.SysFont("Gouranga Cyrillic", 16)
-
-        title_text = end_title_font.render(title, 1, pygame.Color(200, 200, 200), pygame.Color(88, 88, 88))
-        des_text = end_desc_font.render(description, 1, pygame.Color(200, 200, 200), pygame.Color(88, 88, 88))
-
-        instr = self.grid.get_main_draw()
-        for i in instr:
-            i[0](*i[1])
-        pygame.display.update()
-
-        while self.end_msg:
-            pygame.draw.rect(win, pygame.Color(20, 20, 20), shadow)
-            pygame.draw.rect(win, pygame.Color(88, 88, 88), end_window)
-
-            win.blit(title_text, (60, 180))
-            win.blit(des_text, (60, 220))
-            # win.blit(end_description, (302,200))
-
-            restart_button.draw()
-            end_button.draw()
-            menu_button.draw()
-
-            pygame.display.update()
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    quit()
-                else:
-                    pass
-            self.clock.tick(self.fps)
+        self.show_end_msg()
 
     def status_bar(self, pos, figure_size, lines):
         bar_size = list((ci + 2 for ci in self.max_sizes))
@@ -893,7 +883,6 @@ class NetGame(Game):
 
     def end_this_game_and_start_new(self):
         self.terminal.work = False
-        self.terminal.close()
 
         if isinstance(self.terminal, ClientTerminal):
             menu.mainloop()
@@ -916,51 +905,24 @@ class MainMenu:
     fps = 60
     clock = pygame.time.Clock()
 
+    terminals = []
+
     def __init__(self, settings):
         self.setting = settings
 
     def mainloop(self):
         def show_online_menu():
-
-            def try_connect(self):
-                def start():
-                    fine_image = pygame.image.load(r'Images/Text/Area server waiting/Successful.png')
-
-                    win.blit(fine_image, (500, 125))
-
-                    pygame.display.update()
-
-                    time.sleep(2)
-
-                    nonlocal self
-                    self.start_new_game(type_of_game=2, terminal=terminal)
-                    self.gaming = True
-
-                    while self.gaming:
-                        self.game.mainloop()
-
-                def fail():
-                    fail_image = pygame.image.load(r'Images/Text/Area server waiting/Fail.png')
-
-                    win.blit(fail_image, (500, 125))
-
-                    pygame.display.update()
-
-                    time.sleep(2)
-
-                terminal = ClientTerminal()
-                terminal.connect(start, fail)
-
+            nonlocal terminal
             nonlocal showed_menu
             start_server_button = Button((240, 140), (200, 32), self.server_loop, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
                                          "Start Server", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
                                          texture=pygame.image.load("Images\\Menu\\Start server.png"))
 
-            start_client_button = Button((460, 140), (200, 32), try_connect, pygame.Color(255, 255, 255),
+            start_client_button = Button((460, 140), (200, 32), terminal.connecting, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
                                          "Start Client", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
-                                         args=[self],
+                                         args=[start, fail],
                                          texture=pygame.image.load("Images\\Menu\\Connect.png"))
 
             showed_menu = [start_server_button, start_client_button]
@@ -985,7 +947,24 @@ class MainMenu:
         showed_menu = []
 
         back = pygame.image.load(r"Images\main\Background.png")
+
+        terminal = ClientTerminal()
+
+        def start():
+            nonlocal indicator
+            indicator = 600
+
+        def fail():
+            nonlocal indicator
+            indicator = 300
+
+        indicator = -1  # 0..60 - connecting, 300...420-fail, 600..720 - success
+
+        fine_image = pygame.image.load(r'Images/Text/Area server waiting/Successful.png')
+        fail_image = pygame.image.load(r'Images/Text/Area server waiting/Fail.png')
+
         while True:
+
             win.blit(back, (0, 0))
 
             for button in buttons:
@@ -994,18 +973,47 @@ class MainMenu:
             for item in showed_menu:
                 if isinstance(item, (Button, SettingParameter)):
                     item.draw()
+
+            if indicator >= 0:
+
+                indicator += 1
+
+                if 0 <= indicator <= 60:
+                    pygame.draw.rect(win, pygame.Color(0, 0, 200), ((500, 125), (100, 100)))
+
+                elif 300 <= indicator <= 420:
+                    win.blit(fail_image, (500, 125))
+
+                elif 600 <= indicator <= 720:
+                    win.blit(fine_image, (500, 125))
+
+                    if indicator == 720:
+                        self.net_game_loop(terminal, 2)
+                        terminal = ClientTerminal()
+
+                        showed_menu[1] = Button((460, 140), (200, 32), terminal.connecting,
+                                                pygame.Color(255, 255, 255),
+                                                pygame.Color(0, 255, 0),
+                                                "Start Client", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32,
+                                                (105, 6),
+                                                args=[start, fail],
+                                                texture=pygame.image.load("Images\\Menu\\Connect.png"))
+
+
                 else:
-                    item[0](*item[1], **item[2])
+                    indicator = -1
 
             pygame.display.update()
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
+
                     quit()
 
                 else:
                     pass
+
+            self.clock.tick(self.fps)
 
     def server_loop(self):
         connecting = True
@@ -1025,8 +1033,6 @@ class MainMenu:
                                    'max_figure_size': self.setting[4],
                                    'alone_figures': self.setting[8]})
 
-        terminal.accepting(target=successful)
-
         game_info_font = pygame.font.SysFont("Myriad Pro", 24)
         texts = [game_info_font.render(IP[0], 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0)),
                  game_info_font.render(str(IP[1]), 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0)),
@@ -1044,6 +1050,9 @@ class MainMenu:
                         pygame.image.load("Images\\Text\\Area server waiting\\Successful.png")]
 
         while True:
+
+            terminal.accept(target=successful)
+
             win.blit(back, (0, 0))
             win.blit(texts[0], (120, 525))
             win.blit(texts[1], (78, 553))
@@ -1064,7 +1073,6 @@ class MainMenu:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
                     quit()
 
             if start_game:
@@ -1076,13 +1084,9 @@ class MainMenu:
             self.clock.tick(self.fps)
 
         if start_game:
-            self.start_new_game(type_of_game=1, terminal=terminal)
-            self.gaming = True
-
             time.sleep(2)
 
-            while self.gaming:
-                self.game.mainloop()
+            self.net_game_loop(terminal, 1)
 
     def settings_loop(self):
         def exit_settings():
@@ -1092,8 +1096,15 @@ class MainMenu:
 
         show_settings = True
 
+        global alone_figures
+        global lines
+        global ghosts
+        global play_logo
+        global play_music
+        global sounds
+        global lights
+
         textures = {r"Images/Settings menu/Buttons/Alone.png": [alone_figures],
-                    r"Images/Settings menu/Buttons/External lines.png": [lines[1]],
                     r"Images/Settings menu/Buttons/Ghosts.png": [ghosts],
                     r"Images/Settings menu/Buttons/internal lines.png": [lines[0]],
                     r"Images/Settings menu/Buttons/Intro.png": [play_logo],
@@ -1123,12 +1134,12 @@ class MainMenu:
             mb = buttons[:-1]
 
             alone_figures = mb[0].state
-            lines = (mb[3].state, mb[1].state)
-            ghosts = mb[2].state
-            play_logo = mb[4].state
-            play_music = mb[5].state
-            sounds = mb[6].state
-            lights = mb[7].state
+            lines = (mb[2].state, True)
+            ghosts = mb[1].state
+            play_logo = mb[3].state
+            play_music = mb[4].state
+            sounds = mb[5].state
+            lights = mb[6].state
 
             if play_music:
                 if not ms:
@@ -1173,7 +1184,7 @@ class MainMenu:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()
+
                     quit()
 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -1187,6 +1198,17 @@ class MainMenu:
             t = (t + .5) % 1100
 
             self.clock.tick(self.fps)
+
+    def net_game_loop(self, terminal, type_of_game):
+        self.start_new_game(type_of_game=type_of_game, terminal=terminal)
+        self.gaming = True
+        while self.gaming:
+            self.game.mainloop()
+
+        for i in self.terminals:
+            i.close()
+
+        self.terminals = []
 
     def game_loop(self):
         self.start_new_game()
@@ -1206,10 +1228,12 @@ class MainMenu:
         elif type_of_game == 1:
             self.setting[0] = (NetPlayer, NetPlayer)
             self.game = NetGame(terminal, 0, *self.setting[:-1])
+            self.terminals.append(terminal)
 
         elif type_of_game == 2:
             self.setting[0] = (NetPlayer, NetPlayer)
             self.game = NetGame(terminal, 1, *self.setting[:-1])
+            self.terminals.append(terminal)
 
 
 class Player:
@@ -1238,7 +1262,7 @@ class Player:
             self.mouse_figure = [self.get_in_grid_pos(), self.figure_size]
             self.new_step()
 
-        key_binds = {pygame.K_ESCAPE: skip_turn,
+        key_binds = {pygame.K_SPACE: skip_turn,
                      pygame.K_r: self.rotate,
                      pygame.K_F12: self.game.fill
                      }
@@ -1366,7 +1390,7 @@ class NetPlayer(Player):
             self.mouse_figure = [self.get_in_grid_pos(), self.figure_size]
             self.new_step()
 
-        key_binds = {pygame.K_ESCAPE: skip_turn,
+        key_binds = {pygame.K_SPACE: skip_turn,
                      pygame.K_r: self.rotate,
                      pygame.K_F12: self.game.fill
                      }
