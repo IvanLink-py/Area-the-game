@@ -1488,14 +1488,12 @@ if __name__ == '__main__':
         max_figure_size = (6, 6)
         alone_figures = True
         colorsRGBA = [pygame.Color(255, 160, 0, 1), pygame.Color(165, 45, 45, 1)]
-        play_logo = True
         play_music = True
         ghosts = True
         lights = True
         sounds = True
 
-        def_settings = {'intro': True,
-                        'music': True,
+        def_settings = {'music': True,
                         'ghosts': True,
                         'lights': True,
                         'sounds': True,
@@ -1516,7 +1514,6 @@ if __name__ == '__main__':
         max_figure_size = (settings_data['max_figure_size'], settings_data['max_figure_size'])
         alone_figures = settings_data['alone_figures']
         colorsRGBA = [pygame.Color(*settings_data['colorsRGBA'][0]), pygame.Color(*settings_data['colorsRGBA'][1])]
-        play_logo = settings_data['intro']
         lights = settings_data['lights']
         play_music = settings_data['music']
         sounds = settings_data['sounds']
@@ -1524,38 +1521,6 @@ if __name__ == '__main__':
     settings = [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines, alone_figures]
 
     menu = MainMenu(settings)
-
-    if play_logo:
-        t = 0
-
-        background = pygame.image.load('Images/main/BackgroundINTRO.png')
-        GDC = pygame.image.load('Images/main/GDC.png')
-
-        fps = 60
-        clock = pygame.time.Clock()
-
-        sur2 = pygame.Surface((800, 600))
-        sur1 = pygame.Surface((800, 600))
-        sur1.blit(background, (0, 0))
-        sur2.blit(GDC, (0, 0))
-
-        while play_logo:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    quit()
-
-            if t > 50:
-                sur2.set_alpha(t - 50)
-                win.blit(sur2, (0, 0))
-            else:
-                sur1.set_alpha(t)
-                win.blit(sur1, (0, 0))
-
-            pygame.display.update()
-            t += 1
-            if t >= 200:
-                break
-            clock.tick(fps)
 
     if play_music:
         start_music()
