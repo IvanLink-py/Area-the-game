@@ -917,27 +917,27 @@ class MainMenu:
             start_server_button = Button((240, 140), (200, 32), self.server_loop, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
                                          "Start Server", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
-                                         texture=pygame.image.load("Images\\Menu\\Start server.png"))
+                                         texture=pygame.image.load("Images/Menu/Start server.png"))
 
             start_client_button = Button((460, 140), (200, 32), terminal.connecting, pygame.Color(255, 255, 255),
                                          pygame.Color(0, 255, 0),
                                          "Start Client", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32, (105, 6),
                                          args=[start, fail],
-                                         texture=pygame.image.load("Images\\Menu\\Connect.png"))
+                                         texture=pygame.image.load("Images/Menu/Connect.png"))
 
             showed_menu = [start_server_button, start_client_button]
 
         play_offline_button = Button((20, 100), (200, 32), self.game_loop, pygame.Color(255, 255, 255),
-                                     texture=pygame.image.load("Images\\Menu\\Play offline.png"))
+                                     texture=pygame.image.load("Images/Menu/Play offline.png"))
 
         play_online_button = Button((20, 140), (200, 32), show_online_menu, pygame.Color(255, 255, 255),
-                                    texture=pygame.image.load("Images\\Menu\\Play online.png"))
+                                    texture=pygame.image.load("Images/Menu/Play online.png"))
 
         setting_button = Button((20, 180), (200, 32), self.settings_loop, pygame.Color(255, 255, 255),
-                                texture=pygame.image.load("Images\\Menu\\Settings.png"))
+                                texture=pygame.image.load("Images/Menu/Settings.png"))
 
         quit_button = Button((20, 220), (200, 32), quit, pygame.Color(255, 255, 255),
-                             texture=pygame.image.load("Images\\Menu\\Quit.png"))
+                             texture=pygame.image.load("Images/Menu/Quit.png"))
 
         buttons = [play_offline_button,
                    play_online_button,
@@ -946,7 +946,7 @@ class MainMenu:
 
         showed_menu = []
 
-        back = pygame.image.load(r"Images\main\Background.png")
+        back = pygame.image.load(r"Images/main/Background.png")
 
         terminal = ClientTerminal()
 
@@ -997,7 +997,7 @@ class MainMenu:
                                                 "Start Client", pygame.Color(0, 0, 0), "Gouranga Cyrillic", 32,
                                                 (105, 6),
                                                 args=[start, fail],
-                                                texture=pygame.image.load("Images\\Menu\\Connect.png"))
+                                                texture=pygame.image.load("Images/Menu/Connect.png"))
 
 
                 else:
@@ -1039,15 +1039,15 @@ class MainMenu:
                  game_info_font.render('192.168.0.248', 1, pygame.Color(255, 255, 255), pygame.Color(0, 0, 0))]
 
         abort_button = Button((575, 545), (200, 32), stop, pygame.Color(255, 255, 255),
-                              texture=pygame.image.load("Images\\Menu\\Stop.png"))
+                              texture=pygame.image.load("Images/Menu/Stop.png"))
 
         t = 0
 
-        back = pygame.image.load("Images\\main\\Background server.png")
-        waiting_list = [pygame.image.load("Images\\Text\\Area server waiting\\01.png"),
-                        pygame.image.load("Images\\Text\\Area server waiting\\02.png"),
-                        pygame.image.load("Images\\Text\\Area server waiting\\03.png"),
-                        pygame.image.load("Images\\Text\\Area server waiting\\Successful.png")]
+        back = pygame.image.load("Images/main/Background server.png")
+        waiting_list = [pygame.image.load("Images/Text/Area server waiting/01.png"),
+                        pygame.image.load("Images/Text/Area server waiting/02.png"),
+                        pygame.image.load("Images/Text/Area server waiting/03.png"),
+                        pygame.image.load("Images/Text/Area server waiting/Successful.png")]
 
         while True:
 
@@ -1166,7 +1166,7 @@ class MainMenu:
                 [players, grid_pos, grid_size, grid_widget_size, max_figure_size, colorsRGBA, *lines, alone_figures])
 
         save_button = Button((20, 545), (200, 32), exit_settings, pygame.Color(255, 255, 255),
-                             texture=pygame.image.load("Images\\Settings menu\\Buttons\\Save.png"))
+                             texture=pygame.image.load("Images/Settings menu/Buttons/Save.png"))
 
         buttons.append(save_button)
 
@@ -1446,7 +1446,7 @@ def start_music():
     music_volume = [.2, .2, .2, .2]
 
     music_id = random.randint(0, 3)
-    music_file = 'Sounds\\Music\\' + music_list[music_id]
+    music_file = 'Sounds/Music/' + music_list[music_id]
     pygame.mixer.music.load(music_file)
     pygame.mixer.music.set_volume(music_volume[music_id])
     pygame.mixer.music.play(-1)
@@ -1468,7 +1468,7 @@ if __name__ == '__main__':
 
     win = pygame.display.set_mode((800, 600))  # размеры X и Y
     try:
-        pygame.display.set_icon(pygame.image.load("Images\\main\\ico.png"))
+        pygame.display.set_icon(pygame.image.load("Images/main/ico.png"))
     except pygame.error:
         pass
     pygame.display.set_caption("Area")
@@ -1528,8 +1528,8 @@ if __name__ == '__main__':
     if play_logo:
         t = 0
 
-        background = pygame.image.load('Images\\main\\BackgroundINTRO.png')
-        GDC = pygame.image.load('Images\\main\\GDC.png')
+        background = pygame.image.load('Images/main/BackgroundINTRO.png')
+        GDC = pygame.image.load('Images/main/GDC.png')
 
         fps = 60
         clock = pygame.time.Clock()
