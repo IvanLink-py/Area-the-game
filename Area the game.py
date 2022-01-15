@@ -11,9 +11,6 @@ from ast import literal_eval
 
 import pygame
 
-# Идеи уменьшить шанс ввпадения еденичкии в начале игры
-# Если добавим игру в стим, добавить достижение "Победидель по жизни", при выпении еденички в первом шаге
-
 pygame.init()
 pygame.font.init()
 
@@ -1099,7 +1096,6 @@ class MainMenu:
         global alone_figures
         global lines
         global ghosts
-        global play_logo
         global play_music
         global sounds
         global lights
@@ -1107,7 +1103,6 @@ class MainMenu:
         textures = {r"Images/Settings menu/Buttons/Alone.png": [alone_figures],
                     r"Images/Settings menu/Buttons/Ghosts.png": [ghosts],
                     r"Images/Settings menu/Buttons/internal lines.png": [lines[0]],
-                    r"Images/Settings menu/Buttons/Intro.png": [play_logo],
                     r"Images/Settings menu/Buttons/Music.png": [play_music],
                     r"Images/Settings menu/Buttons/Sounds.png": [sounds],
                     r"Images/Settings menu/Buttons/Lights.png": [lights]}
@@ -1123,7 +1118,6 @@ class MainMenu:
             global alone_figures
             global lines
             global ghosts
-            global play_logo
             global play_music
             global sounds
             global lights
@@ -1136,10 +1130,9 @@ class MainMenu:
             alone_figures = mb[0].state
             lines = (mb[2].state, True)
             ghosts = mb[1].state
-            play_logo = mb[3].state
-            play_music = mb[4].state
-            sounds = mb[5].state
-            lights = mb[6].state
+            play_music = mb[3].state
+            sounds = mb[4].state
+            lights = mb[5].state
 
             if play_music:
                 if not ms:
@@ -1147,8 +1140,7 @@ class MainMenu:
             else:
                 pygame.mixer.music.stop()
 
-            settings_data = {'intro': play_logo,
-                             'music': play_music,
+            settings_data = {'music': play_music,
                              'ghosts': ghosts,
                              'lights': lights,
                              'sounds': sounds,
